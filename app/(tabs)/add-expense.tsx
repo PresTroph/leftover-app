@@ -1,202 +1,241 @@
 'use client';
 
+import { BudgetContext } from '@/src/context/BudgetContext';
+import { useLanguage } from '@/src/context/LanguageContext';
+import { useTheme } from '@/src/context/ThemeContext';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
-import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import React, { useContext, useState } from 'react';
+import {
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-const CATEGORIES = [
-  { name: 'Food', emoji: '🍔' },
-  { name: 'Transport', emoji: '🚗' },
-  { name: 'Entertainment', emoji: '🎬' },
-  { name: 'Utilities', emoji: '💡' },
-  { name: 'Shopping', emoji: '🛍️' },
-  { name: 'Other', emoji: '📌' },
-];
+const CATEGORIES = {
+  Food: '🍔',
+  Transport: '🚗',
+  Entertainment: '🎬',
+  Utilities: '💡',
+  Shopping: '🛍️',
+  Other: '📌',
+};
 
 export default function AddExpenseScreen() {
   const router = useRouter();
+  const budgetContext = useContext(BudgetContext);
+  const { colors } = useTheme();
+  const { t } = useLanguage();
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Food');
 
   const handleAddExpense = () => {
-    // TODO: Implement actual expense adding logic
-    router.back();
+    if (!amount || !description) {
+      alert(t.selectCategory); // Placeholder for validation message
+      return;
+    }
+
+    if (budgetContext?.addTransaction) {
+      budgetContext.addTransaction({
+        amount: parseFloat(amount),
+        description,
+        category: selectedCategory,
+        date: new Date().toISOString(),
+      });
+
+      // Reset form and go back
+      setAmount('');
+      setDescription('');
+      setSelectedCategory('Food');
+      router.back();
+    }
   };
 
   return (
-    <ScrollView style={styles.container}>
-      {/* Amount Input */}
-      <View style={styles.section}>
-        <Text style={styles.label}>Amount</Text>
-        <View style={styles.amountContainer}>
-          <Text style={styles.currencySymbol}>$</Text>
-          <TextInput
-            style={styles.amountInput}
-            placeholder="0.00"
-            placeholderTextColor="#64748b"
-            keyboardType="decimal-pad"
-            value={amount}
-            onChangeText={setAmount}
-          />
-        </View>
-      </View>
-
-      {/* Description Input */}
-      <View style={styles.section}>
-        <Text style={styles.label}>What did you buy?</Text>
-        <TextInput
-          style={styles.descriptionInput}
-          placeholder="e.g., Coffee at Starbucks"
-          placeholderTextColor="#64748b"
-          value={description}
-          onChangeText={setDescription}
-          multiline
-        />
-      </View>
-
-      {/* Category Selection */}
-      <View style={styles.section}>
-        <Text style={styles.label}>Category</Text>
-        <View style={styles.categoryGrid}>
-          {CATEGORIES.map((cat) => (
-            <TouchableOpacity
-              key={cat.name}
-              style={[
-                styles.categoryButton,
-                selectedCategory === cat.name && styles.categoryButtonSelected,
-              ]}
-              onPress={() => setSelectedCategory(cat.name)}
-            >
-              <Text style={styles.categoryEmoji}>{cat.emoji}</Text>
-              <Text
-                style={[
-                  styles.categoryText,
-                  selectedCategory === cat.name && styles.categoryTextSelected,
-                ]}
-              >
-                {cat.name}
-              </Text>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.keyboardAvoid}
+      >
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          {/* Header */}
+          <View style={styles.header}>
+            <TouchableOpacity onPress={() => router.back()}>
+              <Ionicons name="chevron-back" size={24} color={colors.accent} />
             </TouchableOpacity>
-          ))}
-        </View>
-      </View>
+            <Text style={[styles.headerTitle, { color: colors.primaryText }]}>{t.addExpense}</Text>
+            <View style={{ width: 24 }} />
+          </View>
 
-      {/* Add Button */}
-      <TouchableOpacity style={styles.addButton} onPress={handleAddExpense}>
-        <Text style={styles.addButtonText}>Add Expense</Text>
-      </TouchableOpacity>
+          {/* Amount Input */}
+          <View style={styles.section}>
+            <Text style={[styles.label, { color: colors.primaryText }]}>{t.expenseAmount}</Text>
+            <View style={[styles.amountInputContainer, { borderColor: colors.border, backgroundColor: colors.cardBackground }]}>
+              <Text style={[styles.currencySymbol, { color: colors.accent }]}>$</Text>
+              <TextInput
+                style={[styles.amountInput, { color: colors.primaryText }]}
+                placeholder={t.enterAmount}
+                placeholderTextColor={colors.secondaryText}
+                keyboardType="decimal-pad"
+                value={amount}
+                onChangeText={setAmount}
+              />
+            </View>
+          </View>
 
-      {/* Cancel Button */}
-      <TouchableOpacity style={styles.cancelButton} onPress={() => router.back()}>
-        <Text style={styles.cancelButtonText}>Cancel</Text>
-      </TouchableOpacity>
+          {/* Description Input */}
+          <View style={styles.section}>
+            <Text style={[styles.label, { color: colors.primaryText }]}>{t.description}</Text>
+            <TextInput
+              style={[styles.descriptionInput, { borderColor: colors.border, backgroundColor: colors.cardBackground, color: colors.primaryText }]}
+              placeholder={t.enterDescription}
+              placeholderTextColor={colors.secondaryText}
+              value={description}
+              onChangeText={setDescription}
+            />
+          </View>
 
-      <View style={{ height: 40 }} />
-    </ScrollView>
+          {/* Category Selector */}
+          <View style={styles.section}>
+            <Text style={[styles.label, { color: colors.primaryText }]}>{t.category}</Text>
+            <View style={styles.categoryGrid}>
+              {Object.entries(CATEGORIES).map(([category, emoji]) => (
+                <TouchableOpacity
+                  key={category}
+                  style={[
+                    styles.categoryButton,
+                    { borderColor: colors.border, backgroundColor: colors.cardBackground },
+                    selectedCategory === category && [styles.categoryButtonActive, { borderColor: colors.accent, backgroundColor: colors.surface }],
+                  ]}
+                  onPress={() => setSelectedCategory(category)}
+                >
+                  <Text style={styles.categoryEmoji}>{emoji}</Text>
+                  <Text style={[styles.categoryLabel, { color: colors.secondaryText }]}>
+                    {t[category.toLowerCase() as keyof typeof t] || category}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          {/* Buttons */}
+          <TouchableOpacity style={[styles.addButton, { backgroundColor: colors.accent }]} onPress={handleAddExpense}>
+            <Text style={[styles.addButtonText, { color: colors.background }]}>{t.addExpense}</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={[styles.cancelButton, { borderColor: colors.border }]} onPress={() => router.back()}>
+            <Text style={[styles.cancelButtonText, { color: colors.secondaryText }]}>{t.cancel}</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000',
-    paddingHorizontal: 20,
-    paddingVertical: 20,
+  },
+  keyboardAvoid: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 32,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '700',
   },
   section: {
     marginBottom: 24,
   },
   label: {
-    color: '#fff',
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '600',
     marginBottom: 8,
   },
-  amountContainer: {
+  amountInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderBottomWidth: 2,
-    borderBottomColor: '#0EA5E9',
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingLeft: 12,
   },
   currencySymbol: {
-    color: '#0EA5E9',
     fontSize: 24,
-    fontWeight: '600',
+    fontWeight: '700',
     marginRight: 4,
   },
   amountInput: {
     flex: 1,
-    color: '#fff',
-    fontSize: 32,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    fontSize: 20,
     fontWeight: '600',
-    paddingVertical: 8,
   },
   descriptionInput: {
-    backgroundColor: '#1e293b',
-    color: '#fff',
-    fontSize: 14,
+    borderWidth: 1,
+    borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 12,
-    borderRadius: 8,
-    minHeight: 80,
-    textAlignVertical: 'top',
+    fontSize: 14,
   },
   categoryGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: 12,
   },
   categoryButton: {
-    flex: 1,
-    minWidth: '30%',
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-    borderWidth: 2,
-    borderColor: '#334155',
-    borderRadius: 8,
+    width: '30%',
+    aspectRatio: 1,
+    borderWidth: 1,
+    borderRadius: 12,
+    justifyContent: 'center',
     alignItems: 'center',
+    gap: 4,
   },
-  categoryButtonSelected: {
-    borderColor: '#0EA5E9',
-    backgroundColor: '#0EA5E920',
+  categoryButtonActive: {
   },
   categoryEmoji: {
     fontSize: 24,
-    marginBottom: 4,
   },
-  categoryText: {
-    color: '#64748b',
-    fontSize: 11,
-    fontWeight: '500',
-  },
-  categoryTextSelected: {
-    color: '#0EA5E9',
-    fontWeight: '600',
+  categoryLabel: {
+    fontSize: 12,
+    textAlign: 'center',
   },
   addButton: {
-    backgroundColor: '#0EA5E9',
     paddingVertical: 14,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 24,
+    borderRadius: 12,
+    marginBottom: 12,
   },
   addButtonText: {
-    color: '#000',
     fontSize: 16,
     fontWeight: '600',
+    textAlign: 'center',
   },
   cancelButton: {
-    paddingVertical: 12,
+    paddingVertical: 14,
     borderWidth: 1,
-    borderColor: '#334155',
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 12,
+    borderRadius: 12,
   },
   cancelButtonText: {
-    color: '#64748b',
-    fontSize: 14,
-    fontWeight: '500',
+    fontSize: 16,
+    fontWeight: '600',
+    textAlign: 'center',
   },
 });

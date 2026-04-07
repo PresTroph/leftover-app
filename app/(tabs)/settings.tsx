@@ -1,207 +1,265 @@
 'use client';
 
-import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
-import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { BudgetContext } from '@/src/context/BudgetContext';
+import { useLanguage } from '@/src/context/LanguageContext';
+import { useTheme } from '@/src/context/ThemeContext';
+import { Ionicons } from '@expo/vector-icons';
+import React, { useContext, useState } from 'react';
+import {
+    ScrollView,
+    StyleSheet,
+    Switch,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function SettingsScreen() {
-  const router = useRouter();
-  const [budget, setBudget] = useState('300');
-  const [language, setLanguage] = useState('en');
+  const budgetContext = useContext(BudgetContext);
+  const { isDarkMode, toggleTheme } = useTheme();
+  const { language, setLanguage, t } = useLanguage();
+  const [budgetInput, setBudgetInput] = useState(
+    (budgetContext?.weeklyBudget || 300).toString()
+  );
 
   const handleSaveBudget = () => {
-    // TODO: Save budget to context
+    const newBudget = parseFloat(budgetInput);
+    if (newBudget > 0 && budgetContext?.setBudget) {
+      budgetContext.setBudget(newBudget);
+      alert(t.save);
+    }
   };
 
-  const handleLogout = () => {
-    // TODO: Implement logout
-    router.replace('/(auth)/login');
+  const handleLanguageChange = (lang: 'en' | 'es' | 'fr') => {
+    setLanguage(lang);
   };
 
   return (
-    <ScrollView style={styles.container}>
-      {/* Budget Section */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Weekly Budget</Text>
-        <Text style={styles.sectionDescription}>Set your target spending for the week</Text>
-        
-        <View style={styles.inputContainer}>
-          <Text style={styles.currencySymbol}>$</Text>
-          <TextInput
-            style={styles.budgetInput}
-            placeholder="300"
-            placeholderTextColor="#64748b"
-            keyboardType="decimal-pad"
-            value={budget}
-            onChangeText={setBudget}
-          />
+    <SafeAreaView style={[styles.container, { backgroundColor: useTheme().colors.background }]}>
+      <ScrollView showsVerticalScrollIndicator={false}>
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={[styles.headerTitle, { color: useTheme().colors.primaryText }]}>{t.settings}</Text>
         </View>
 
-        <TouchableOpacity style={styles.button} onPress={handleSaveBudget}>
-          <Text style={styles.buttonText}>Save Budget</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Language Section */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Language</Text>
-        <Text style={styles.sectionDescription}>Choose your preferred language</Text>
-
-        <View style={styles.languageOptions}>
-          {[
-            { code: 'en', label: 'English' },
-            { code: 'es', label: 'Español' },
-            { code: 'fr', label: 'Français' },
-          ].map((lang) => (
-            <TouchableOpacity
-              key={lang.code}
-              style={[
-                styles.languageButton,
-                language === lang.code && styles.languageButtonSelected,
-              ]}
-              onPress={() => setLanguage(lang.code)}
-            >
-              <Text
-                style={[
-                  styles.languageButtonText,
-                  language === lang.code && styles.languageButtonTextSelected,
-                ]}
-              >
-                {lang.label}
-              </Text>
+        {/* Budget Section */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: useTheme().colors.secondaryText }]}>{t.weeklyBudget}</Text>
+          <View style={[styles.card, { backgroundColor: useTheme().colors.cardBackground, borderColor: useTheme().colors.border }]}>
+            <Text style={[styles.label, { color: useTheme().colors.primaryText }]}>{t.weeklyBudget}</Text>
+            <View style={[styles.budgetInputContainer, { borderTopColor: useTheme().colors.border }]}>
+              <Text style={[styles.currencySymbol, { color: useTheme().colors.accent }]}>$</Text>
+              <TextInput
+                style={[styles.budgetInput, { color: useTheme().colors.primaryText }]}
+                placeholder="300.00"
+                placeholderTextColor={useTheme().colors.secondaryText}
+                keyboardType="decimal-pad"
+                value={budgetInput}
+                onChangeText={setBudgetInput}
+              />
+            </View>
+            <TouchableOpacity style={[styles.saveButton, { backgroundColor: useTheme().colors.accent }]} onPress={handleSaveBudget}>
+              <Text style={[styles.saveButtonText, { color: useTheme().colors.background }]}>{t.save}</Text>
             </TouchableOpacity>
-          ))}
+          </View>
         </View>
-      </View>
 
-      {/* About Section */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>About</Text>
-        <View style={styles.infoBox}>
-          <Text style={styles.infoText}>
-            <Text style={styles.infoLabel}>App: </Text>Leftover
-          </Text>
-          <Text style={styles.infoText}>
-            <Text style={styles.infoLabel}>Version: </Text>1.0.0
-          </Text>
-          <Text style={styles.infoText}>
-            <Text style={styles.infoLabel}>Purpose: </Text>The lazy budget app for Gen-Z
-          </Text>
+        {/* Preferences Section */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: useTheme().colors.secondaryText }]}>{t.language}</Text>
+          <View style={[styles.card, { backgroundColor: useTheme().colors.cardBackground, borderColor: useTheme().colors.border }]}>
+            <View style={styles.preferenceRow}>
+              <Text style={[styles.label, { color: useTheme().colors.primaryText }]}>{t.language}</Text>
+              <View style={styles.languageSelector}>
+                {[
+                  { key: 'en', label: t.english },
+                  { key: 'es', label: t.spanish },
+                  { key: 'fr', label: t.french },
+                ].map(({ key, label }) => (
+                  <TouchableOpacity
+                    key={key}
+                    style={[
+                      styles.languageOption,
+                      { borderColor: useTheme().colors.border, backgroundColor: useTheme().colors.cardBackground },
+                      language === key && [styles.languageOptionActive, { borderColor: useTheme().colors.accent, backgroundColor: useTheme().colors.surface }],
+                    ]}
+                    onPress={() => handleLanguageChange(key as 'en' | 'es' | 'fr')}
+                  >
+                    <Text
+                      style={[
+                        styles.languageText,
+                        { color: useTheme().colors.secondaryText },
+                        language === key && [styles.languageTextActive, { color: useTheme().colors.accent }],
+                      ]}
+                    >
+                      {label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            <View style={[styles.preferenceRow, styles.borderTop, { borderTopColor: useTheme().colors.border }]}>
+              <Text style={[styles.label, { color: useTheme().colors.primaryText }]}>
+                {isDarkMode ? t.darkMode : t.lightMode}
+              </Text>
+              <Switch
+                value={isDarkMode}
+                onValueChange={toggleTheme}
+                trackColor={{ false: useTheme().colors.secondaryText, true: useTheme().colors.accent }}
+                thumbColor={useTheme().colors.primaryText}
+              />
+            </View>
+          </View>
         </View>
-      </View>
 
-      {/* Logout Button */}
-      <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-        <Text style={styles.logoutButtonText}>Log Out</Text>
-      </TouchableOpacity>
+        {/* App Info Section */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: useTheme().colors.secondaryText }]}>{t.about}</Text>
+          <View style={[styles.card, { backgroundColor: useTheme().colors.cardBackground, borderColor: useTheme().colors.border }]}>
+            <View style={styles.infoRow}>
+              <Text style={[styles.infoLabel, { color: useTheme().colors.primaryText }]}>Leftover</Text>
+              <Text style={[styles.infoValue, { color: useTheme().colors.secondaryText }]}>1.0.0</Text>
+            </View>
+            <View style={[styles.infoRow, styles.borderTop, { borderTopColor: useTheme().colors.border }]}>
+              <Text style={[styles.infoLabel, { color: useTheme().colors.primaryText }]}>The lazy budget app</Text>
+              <Text style={[styles.infoValue, { color: useTheme().colors.secondaryText }]}>for Gen-Z</Text>
+            </View>
+            <TouchableOpacity style={[styles.infoRow, styles.borderTop, { borderTopColor: useTheme().colors.border }]}>
+              <Text style={[styles.linkText, { color: useTheme().colors.accent }]}>Privacy Policy</Text>
+              <Ionicons name="chevron-forward" size={20} color={useTheme().colors.accent} />
+            </TouchableOpacity>
+          </View>
+        </View>
 
-      <View style={{ height: 40 }} />
-    </ScrollView>
+        {/* Logout Section */}
+        <View style={styles.section}>
+          <TouchableOpacity style={[styles.logoutButton, { backgroundColor: useTheme().colors.danger }]}>
+            <Text style={[styles.logoutButtonText, { color: useTheme().colors.primaryText }]}>Logout</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000',
-    paddingHorizontal: 20,
-    paddingVertical: 20,
+    paddingTop: 16,
+  },
+  header: {
+    paddingHorizontal: 16,
+    marginBottom: 24,
+  },
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: '700',
   },
   section: {
-    marginBottom: 32,
+    paddingHorizontal: 16,
+    marginBottom: 24,
   },
   sectionTitle: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '700',
-    marginBottom: 4,
+    fontSize: 14,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 12,
   },
-  sectionDescription: {
-    color: '#64748b',
-    fontSize: 12,
-    marginBottom: 16,
+  card: {
+    borderRadius: 12,
+    borderWidth: 1,
+    overflow: 'hidden',
   },
-  inputContainer: {
+  label: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  budgetInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderBottomWidth: 2,
-    borderBottomColor: '#0EA5E9',
-    marginBottom: 16,
+    borderTopWidth: 1,
+    paddingTop: 12,
+    marginTop: 12,
   },
   currencySymbol: {
-    color: '#0EA5E9',
-    fontSize: 20,
-    fontWeight: '600',
+    fontSize: 18,
+    fontWeight: '700',
     marginRight: 4,
   },
   budgetInput: {
     flex: 1,
-    color: '#fff',
-    fontSize: 24,
-    fontWeight: '600',
     paddingVertical: 8,
+    paddingHorizontal: 8,
+    fontSize: 16,
   },
-  button: {
-    backgroundColor: '#0EA5E9',
-    paddingVertical: 12,
+  saveButton: {
+    marginTop: 12,
+    paddingVertical: 10,
     borderRadius: 8,
-    alignItems: 'center',
   },
-  buttonText: {
-    color: '#000',
+  saveButtonText: {
     fontSize: 14,
     fontWeight: '600',
+    textAlign: 'center',
   },
-  languageOptions: {
+  preferenceRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+  },
+  borderTop: {
+    borderTopWidth: 1,
+  },
+  languageSelector: {
     flexDirection: 'row',
     gap: 8,
   },
-  languageButton: {
-    flex: 1,
-    paddingVertical: 10,
-    paddingHorizontal: 8,
-    borderWidth: 2,
-    borderColor: '#334155',
+  languageOption: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: 8,
-    alignItems: 'center',
+    borderWidth: 1,
   },
-  languageButtonSelected: {
-    borderColor: '#0EA5E9',
-    backgroundColor: '#0EA5E920',
+  languageOptionActive: {
   },
-  languageButtonText: {
-    color: '#64748b',
+  languageText: {
     fontSize: 12,
     fontWeight: '500',
   },
-  languageButtonTextSelected: {
-    color: '#0EA5E9',
-    fontWeight: '600',
+  languageTextActive: {
   },
-  infoBox: {
-    backgroundColor: '#1e293b',
-    paddingHorizontal: 16,
+  infoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     paddingVertical: 16,
-    borderRadius: 8,
-  },
-  infoText: {
-    color: '#cbd5e1',
-    fontSize: 13,
-    lineHeight: 20,
+    paddingHorizontal: 16,
   },
   infoLabel: {
-    fontWeight: '600',
-    color: '#0EA5E9',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  infoValue: {
+    fontSize: 14,
+  },
+  linkText: {
+    fontSize: 14,
+    fontWeight: '500',
   },
   logoutButton: {
-    backgroundColor: '#ef4444',
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: 'center',
+    paddingVertical: 14,
+    borderRadius: 12,
+    marginBottom: 32,
   },
   logoutButtonText: {
-    color: '#fff',
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '600',
+    textAlign: 'center',
   },
 });
