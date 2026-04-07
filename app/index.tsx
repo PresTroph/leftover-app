@@ -76,8 +76,12 @@ export default function OnboardingScreen() {
   };
 
   const handleGetStarted = () => {
-    // Auto-create anonymous account and go to dashboard
-    router.replace('/(tabs)/dashboard');
+    // Go to auth flow — user signs up or logs in
+    router.push('/(auth)/signup');
+  };
+
+  const handleLogin = () => {
+    router.push('/(auth)/login');
   };
 
   return (
@@ -125,9 +129,16 @@ export default function OnboardingScreen() {
         activeOpacity={0.8}
       >
         <Text style={[styles.buttonText, { color: colors.background }]}>
-          {currentIndex === SLIDES.length - 1 ? t.getStarted : t.next}
+          {t.getStarted}
         </Text>
         <Text style={[styles.buttonArrow, { color: colors.background }]}>›</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity style={styles.loginLink} onPress={handleLogin}>
+        <Text style={[styles.loginLinkText, { color: colors.secondaryText }]}> 
+          Already have an account?{' '}
+        </Text>
+        <Text style={[styles.loginLinkAccent, { color: colors.accent }]}>Sign In</Text>
       </TouchableOpacity>
     </SafeAreaView>
   );
@@ -137,7 +148,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     justifyContent: 'space-between',
-    paddingBottom: 60,
+    paddingBottom: 40,
   },
   carousel: {
     flex: 1,
@@ -199,5 +210,17 @@ const styles = StyleSheet.create({
   buttonArrow: {
     fontSize: 20,
     marginLeft: 4,
+  },
+  loginLink: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: 16,
+  },
+  loginLinkText: {
+    fontSize: 14,
+  },
+  loginLinkAccent: {
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

@@ -1,3 +1,21 @@
+// ============================================================
+// LEFTOVER - Firebase Configuration
+// ============================================================
+//
+// SETUP INSTRUCTIONS:
+//
+// 1. Go to https://console.firebase.google.com
+// 2. Create a new project called "leftover" (or whatever you want)
+// 3. Enable Authentication → Sign-in method → Apple + Google
+// 4. Create a Firestore Database (start in test mode for dev)
+// 5. Go to Project Settings → General → Your apps → Add Web App
+// 6. Copy the config values below
+//
+// INSTALL:
+//   npx expo install firebase
+//
+// ============================================================
+
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
@@ -11,13 +29,8 @@ const firebaseConfig = {
   appId: "1:450913259929:web:ce04b66c7791206384c308"
 };
 
-// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-// Initialize Firebase Authentication and get a reference to the service
-export const auth = getAuth(app);
-
-// Initialize Cloud Firestore and get a reference to the service
 export const db = getFirestore(app);
-
+export const auth = getAuth(app);
 export default app;
