@@ -29,7 +29,7 @@ export default function TabsLayout() {
         name="dashboard"
         options={{
           title: t.dashboard,
-          tabBarIcon: ({ color }) => (
+          tabBarIcon: ({ color }: { color: string }) => (
             <Ionicons name="home" size={24} color={color} />
           ),
         }}
@@ -38,7 +38,7 @@ export default function TabsLayout() {
         name="add-expense"
         options={{
           title: t.addExpense,
-          tabBarIcon: ({ color }) => (
+          tabBarIcon: ({ color }: { color: string }) => (
             <Ionicons name="add-circle" size={24} color={color} />
           ),
         }}
@@ -47,7 +47,7 @@ export default function TabsLayout() {
         name="settings"
         options={{
           title: t.settings,
-          tabBarIcon: ({ color }) => (
+          tabBarIcon: ({ color }: { color: string }) => (
             <Ionicons name="settings" size={24} color={color} />
           ),
         }}

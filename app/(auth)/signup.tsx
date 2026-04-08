@@ -49,13 +49,14 @@ export default function SignUpScreen() {
     try {
       await signUp(email.trim(), password);
       router.replace('/(tabs)/dashboard');
-    } catch (err: any) {
-      Alert.alert('Sign Up Failed', err.message || 'Something went wrong');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Something went wrong';
+      Alert.alert('Sign Up Failed', message);
     }
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}> 
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}

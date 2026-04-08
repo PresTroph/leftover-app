@@ -1,9 +1,14 @@
+// ============================================================
+// LEFTOVER - Income Setup Screen
+// Add, edit, delete income sources
+// ============================================================
+
 'use client';
 
 import { useBudget } from '@/src/context/BudgetContext';
 import { useLanguage } from '@/src/context/LanguageContext';
 import { useTheme } from '@/src/context/ThemeContext';
-import { DayOfWeek, IncomeFrequency } from '@/src/types';
+import { DayOfWeek, Income, IncomeFrequency } from '@/src/types';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
@@ -91,8 +96,8 @@ export default function IncomeSetupScreen() {
         active: true,
       });
       resetForm();
-    } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to add income');
+    } catch (err: unknown) {
+      Alert.alert('Error', err instanceof Error ? err.message : 'Failed to add income');
     }
   };
 
@@ -116,7 +121,7 @@ export default function IncomeSetupScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}> 
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
@@ -135,17 +140,17 @@ export default function IncomeSetupScreen() {
           {incomes.length > 0 && (
             <View style={styles.section}>
               <Text style={[styles.sectionTitle, { color: colors.secondaryText }]}>YOUR INCOME</Text>
-              {incomes.map((income) => (
+              {incomes.map((income: Income) => (
                 <View
                   key={income.id}
                   style={[styles.incomeCard, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}
                 >
                   <View style={styles.incomeInfo}>
                     <Text style={[styles.incomeName, { color: colors.primaryText }]}>{income.name}</Text>
-                    <Text style={[styles.incomeDetail, { color: colors.secondaryText }]}> 
+                    <Text style={[styles.incomeDetail, { color: colors.secondaryText }]}>
                       ${income.amount.toFixed(2)} · {getFrequencyLabel(income.type)}
                     </Text>
-                    <Text style={[styles.incomeMonthly, { color: colors.accent }]}> 
+                    <Text style={[styles.incomeMonthly, { color: colors.accent }]}>
                       ${income.monthlyTotal.toFixed(2)}/month
                     </Text>
                   </View>
@@ -167,7 +172,7 @@ export default function IncomeSetupScreen() {
               <Text style={[styles.addButtonText, { color: colors.background }]}>Add Income Source</Text>
             </TouchableOpacity>
           ) : (
-            <View style={[styles.formCard, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}> 
+            <View style={[styles.formCard, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}>
               <Text style={[styles.formTitle, { color: colors.primaryText }]}>New Income Source</Text>
 
               {/* Name */}
@@ -185,7 +190,7 @@ export default function IncomeSetupScreen() {
               {/* Amount */}
               <View style={styles.inputGroup}>
                 <Text style={[styles.label, { color: colors.secondaryText }]}>AMOUNT (PER PERIOD)</Text>
-                <View style={[styles.amountContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}> 
+                <View style={[styles.amountContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                   <Text style={[styles.currencySymbol, { color: colors.accent }]}>$</Text>
                   <TextInput
                     style={[styles.amountInput, { color: colors.primaryText }]}
@@ -307,7 +312,7 @@ export default function IncomeSetupScreen() {
                   size={20}
                   color={isLocked ? colors.accent : colors.secondaryText}
                 />
-                <Text style={[styles.lockText, { color: colors.primaryText }]}> 
+                <Text style={[styles.lockText, { color: colors.primaryText }]}>
                   Lock income (prevent changes)
                 </Text>
               </TouchableOpacity>

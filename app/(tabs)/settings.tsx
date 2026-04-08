@@ -1,3 +1,8 @@
+// ============================================================
+// LEFTOVER - Settings Screen (Enhanced)
+// Links to all setup screens + reset config + real logout
+// ============================================================
+
 'use client';
 
 import { useAuth } from '@/src/context/AuthContext';
@@ -51,7 +56,7 @@ export default function SettingsScreen() {
   const savingsTarget = budgetState?.savingsTarget || savings?.monthlyTarget || 0;
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}> 
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Header */}
         <View style={styles.header}>
@@ -64,19 +69,19 @@ export default function SettingsScreen() {
         {/* ─── Financial Setup ─── */}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.secondaryText }]}>FINANCIAL SETUP</Text>
-          <View style={[styles.card, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}> 
+          <View style={[styles.card, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}>
             {/* Income */}
             <TouchableOpacity
               style={styles.settingsRow}
               onPress={() => router.push('/income-setup')}
             >
               <View style={styles.settingsRowLeft}>
-                <View style={[styles.iconCircle, { backgroundColor: colors.accent + '20' }]}> 
+                <View style={[styles.iconCircle, { backgroundColor: colors.accent + '20' }]}>
                   <Ionicons name="wallet-outline" size={20} color={colors.accent} />
                 </View>
                 <View>
                   <Text style={[styles.settingsLabel, { color: colors.primaryText }]}>Income Sources</Text>
-                  <Text style={[styles.settingsValue, { color: colors.secondaryText }]}> 
+                  <Text style={[styles.settingsValue, { color: colors.secondaryText }]}>
                     {incomeCount > 0 ? `${incomeCount} source${incomeCount > 1 ? 's' : ''} · $${totalMonthlyIncome.toFixed(0)}/mo` : 'Not set up yet'}
                   </Text>
                 </View>
@@ -92,12 +97,12 @@ export default function SettingsScreen() {
               onPress={() => router.push('/constants-setup')}
             >
               <View style={styles.settingsRowLeft}>
-                <View style={[styles.iconCircle, { backgroundColor: colors.warning + '20' }]}> 
+                <View style={[styles.iconCircle, { backgroundColor: colors.warning + '20' }]}>
                   <Ionicons name="repeat-outline" size={20} color={colors.warning} />
                 </View>
                 <View>
                   <Text style={[styles.settingsLabel, { color: colors.primaryText }]}>Constants & Necessities</Text>
-                  <Text style={[styles.settingsValue, { color: colors.secondaryText }]}> 
+                  <Text style={[styles.settingsValue, { color: colors.secondaryText }]}>
                     {constantsCount > 0 ? `${constantsCount} item${constantsCount > 1 ? 's' : ''} · $${totalMonthlyConstants.toFixed(0)}/mo` : 'Not set up yet'}
                   </Text>
                 </View>
@@ -113,12 +118,12 @@ export default function SettingsScreen() {
               onPress={() => router.push('/savings-setup')}
             >
               <View style={styles.settingsRowLeft}>
-                <View style={[styles.iconCircle, { backgroundColor: '#10b981' + '20' }]}> 
+                <View style={[styles.iconCircle, { backgroundColor: '#10b981' + '20' }]}>
                   <Ionicons name="trending-up-outline" size={20} color="#10b981" />
                 </View>
                 <View>
                   <Text style={[styles.settingsLabel, { color: colors.primaryText }]}>Savings Goal</Text>
-                  <Text style={[styles.settingsValue, { color: colors.secondaryText }]}> 
+                  <Text style={[styles.settingsValue, { color: colors.secondaryText }]}>
                     {savingsTarget > 0 ? `$${savingsTarget.toFixed(0)}/mo target` : 'Not set up yet'}
                   </Text>
                 </View>
@@ -132,7 +137,7 @@ export default function SettingsScreen() {
         {budgetState && budgetState.monthlyAvailable > 0 && (
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, { color: colors.secondaryText }]}>BUDGET SUMMARY</Text>
-            <View style={[styles.card, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}> 
+            <View style={[styles.card, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}>
               <View style={styles.summaryRow}>
                 <Text style={[styles.summaryLabel, { color: colors.secondaryText }]}>Monthly Income</Text>
                 <Text style={[styles.summaryValue, { color: colors.accent }]}>${budgetState.totalMonthlyIncome.toFixed(2)}</Text>
@@ -159,7 +164,7 @@ export default function SettingsScreen() {
         {/* ─── Preferences ─── */}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.secondaryText }]}>{t.language}</Text>
-          <View style={[styles.card, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}> 
+          <View style={[styles.card, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}>
             <View style={styles.settingsRow}>
               <Text style={[styles.settingsLabel, { color: colors.primaryText }]}>{t.language}</Text>
               <View style={styles.languageSelector}>
@@ -194,7 +199,7 @@ export default function SettingsScreen() {
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
 
             <View style={styles.settingsRow}>
-              <Text style={[styles.settingsLabel, { color: colors.primaryText }]}> 
+              <Text style={[styles.settingsLabel, { color: colors.primaryText }]}>
                 {isDarkMode ? t.darkMode : t.lightMode}
               </Text>
               <Switch
@@ -210,7 +215,7 @@ export default function SettingsScreen() {
         {/* ─── About ─── */}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.secondaryText }]}>{t.about}</Text>
-          <View style={[styles.card, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}> 
+          <View style={[styles.card, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}>
             <View style={styles.settingsRow}>
               <Text style={[styles.settingsLabel, { color: colors.primaryText }]}>Leftover</Text>
               <Text style={[styles.settingsValue, { color: colors.secondaryText }]}>1.0.0</Text>

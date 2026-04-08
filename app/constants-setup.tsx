@@ -1,8 +1,13 @@
+// ============================================================
+// LEFTOVER - Constants/Necessities Setup Screen
+// Add, edit, delete recurring expenses
+// ============================================================
+
 'use client';
 
 import { useBudget } from '@/src/context/BudgetContext';
 import { useTheme } from '@/src/context/ThemeContext';
-import { ConstantCategory, ConstantFrequency, DayOfWeek } from '@/src/types';
+import { Constant, ConstantCategory, ConstantFrequency, DayOfWeek } from '@/src/types';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
@@ -97,8 +102,8 @@ export default function ConstantsSetupScreen() {
         active: true,
       });
       resetForm();
-    } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to add constant');
+    } catch (err: unknown) {
+      Alert.alert('Error', err instanceof Error ? err.message : 'Failed to add constant');
     }
   };
 
@@ -118,11 +123,11 @@ export default function ConstantsSetupScreen() {
   };
 
   const totalMonthly = constants
-    .filter((c) => c.active)
-    .reduce((sum, c) => sum + (c.monthlyTotal || 0), 0);
+    .filter((c: Constant) => c.active)
+    .reduce((sum: number, c: Constant) => sum + (c.monthlyTotal || 0), 0);
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}> 
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
           {/* Header */}
@@ -136,7 +141,7 @@ export default function ConstantsSetupScreen() {
 
           {/* Monthly Total */}
           {constants.length > 0 && (
-            <View style={[styles.totalCard, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}> 
+            <View style={[styles.totalCard, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}>
               <Text style={[styles.totalLabel, { color: colors.secondaryText }]}>TOTAL MONTHLY CONSTANTS</Text>
               <Text style={[styles.totalAmount, { color: colors.warning }]}>${totalMonthly.toFixed(2)}</Text>
             </View>
@@ -146,12 +151,12 @@ export default function ConstantsSetupScreen() {
           {constants.length > 0 && (
             <View style={styles.section}>
               <Text style={[styles.sectionTitle, { color: colors.secondaryText }]}>YOUR RECURRING EXPENSES</Text>
-              {constants.map((c) => (
-                <View key={c.id} style={[styles.constCard, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}> 
+              {constants.map((c: Constant) => (
+                <View key={c.id} style={[styles.constCard, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}>
                   <Text style={styles.constEmoji}>{getCategoryEmoji(c.category)}</Text>
                   <View style={styles.constInfo}>
                     <Text style={[styles.constName, { color: colors.primaryText }]}>{c.name}</Text>
-                    <Text style={[styles.constDetail, { color: colors.secondaryText }]}> 
+                    <Text style={[styles.constDetail, { color: colors.secondaryText }]}>
                       ${c.amount.toFixed(2)} · {c.frequency} → ${c.monthlyTotal.toFixed(2)}/mo
                     </Text>
                   </View>
@@ -173,7 +178,7 @@ export default function ConstantsSetupScreen() {
               <Text style={[styles.addButtonText, { color: colors.background }]}>Add Constant</Text>
             </TouchableOpacity>
           ) : (
-            <View style={[styles.formCard, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}> 
+            <View style={[styles.formCard, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}>
               <Text style={[styles.formTitle, { color: colors.primaryText }]}>New Recurring Expense</Text>
 
               {/* Name */}
@@ -191,7 +196,7 @@ export default function ConstantsSetupScreen() {
               {/* Amount */}
               <View style={styles.inputGroup}>
                 <Text style={[styles.label, { color: colors.secondaryText }]}>AMOUNT</Text>
-                <View style={[styles.amountContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}> 
+                <View style={[styles.amountContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                   <Text style={[styles.currencySymbol, { color: colors.accent }]}>$</Text>
                   <TextInput
                     style={[styles.amountInput, { color: colors.primaryText }]}
@@ -219,7 +224,7 @@ export default function ConstantsSetupScreen() {
                       onPress={() => setCategory(cat.key)}
                     >
                       <Text style={styles.categoryEmoji}>{cat.emoji}</Text>
-                      <Text style={[styles.categoryLabel, { color: category === cat.key ? colors.accent : colors.secondaryText }]}> 
+                      <Text style={[styles.categoryLabel, { color: category === cat.key ? colors.accent : colors.secondaryText }]}>
                         {cat.label}
                       </Text>
                     </TouchableOpacity>
@@ -241,7 +246,7 @@ export default function ConstantsSetupScreen() {
                       ]}
                       onPress={() => setFrequency(freq.key)}
                     >
-                      <Text style={[styles.frequencyText, { color: frequency === freq.key ? colors.accent : colors.secondaryText }]}> 
+                      <Text style={[styles.frequencyText, { color: frequency === freq.key ? colors.accent : colors.secondaryText }]}>
                         {freq.label}
                       </Text>
                     </TouchableOpacity>
@@ -264,7 +269,7 @@ export default function ConstantsSetupScreen() {
                         ]}
                         onPress={() => setDayOfWeek(day.key)}
                       >
-                        <Text style={[styles.dayText, { color: dayOfWeek === day.key ? colors.accent : colors.secondaryText }]}> 
+                        <Text style={[styles.dayText, { color: dayOfWeek === day.key ? colors.accent : colors.secondaryText }]}>
                           {day.label}
                         </Text>
                       </TouchableOpacity>

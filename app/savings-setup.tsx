@@ -1,3 +1,7 @@
+// ============================================================
+// LEFTOVER - Savings Setup Screen
+// ============================================================
+
 'use client';
 
 import { useBudget } from '@/src/context/BudgetContext';
@@ -61,8 +65,8 @@ export default function SavingsSetupScreen() {
         });
       }
       Alert.alert('Saved', 'Savings goal updated!');
-    } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to save');
+    } catch (err: unknown) {
+      Alert.alert('Error', (err instanceof Error ? err.message : "Something went wrong") || 'Failed to save');
     }
   };
 
@@ -76,8 +80,8 @@ export default function SavingsSetupScreen() {
       await addToSavings(amt);
       setDepositAmount('');
       Alert.alert('Done', `$${amt.toFixed(2)} added to savings`);
-    } catch (err: any) {
-      Alert.alert('Error', err.message);
+    } catch (err: unknown) {
+      Alert.alert('Error', (err instanceof Error ? err.message : "Something went wrong"));
     }
   };
 
@@ -91,8 +95,8 @@ export default function SavingsSetupScreen() {
       await withdrawFromSavings(amt);
       setWithdrawAmount('');
       Alert.alert('Done', `$${amt.toFixed(2)} withdrawn from savings`);
-    } catch (err: any) {
-      Alert.alert('Error', err.message);
+    } catch (err: unknown) {
+      Alert.alert('Error', (err instanceof Error ? err.message : "Something went wrong"));
     }
   };
 
@@ -100,8 +104,8 @@ export default function SavingsSetupScreen() {
     if (!savings) return;
     try {
       await updateSavings({ id: 'main', isLocked: !savings.isLocked });
-    } catch (err: any) {
-      Alert.alert('Error', err.message);
+    } catch (err: unknown) {
+      Alert.alert('Error', (err instanceof Error ? err.message : "Something went wrong"));
     }
   };
 
@@ -110,7 +114,7 @@ export default function SavingsSetupScreen() {
   const progressPercent = target > 0 ? Math.min((currentAmount / target) * 100, 100) : 0;
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}> 
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
           {/* Header */}
@@ -124,20 +128,20 @@ export default function SavingsSetupScreen() {
 
           {/* Current Savings Display */}
           {savings && (
-            <View style={[styles.progressCard, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}> 
+            <View style={[styles.progressCard, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}>
               <Text style={[styles.progressLabel, { color: colors.secondaryText }]}>CURRENT SAVINGS</Text>
               <Text style={[styles.progressAmount, { color: colors.accent }]}>${currentAmount.toFixed(2)}</Text>
               {target > 0 && (
                 <>
-                  <Text style={[styles.progressTarget, { color: colors.secondaryText }]}> 
+                  <Text style={[styles.progressTarget, { color: colors.secondaryText }]}>
                     of ${target.toFixed(2)} goal
                   </Text>
-                  <View style={[styles.progressBarContainer, { backgroundColor: colors.surface }]}> 
+                  <View style={[styles.progressBarContainer, { backgroundColor: colors.surface }]}>
                     <View
                       style={[styles.progressBar, { width: `${progressPercent}%`, backgroundColor: colors.accent }]}
                     />
                   </View>
-                  <Text style={[styles.progressPercent, { color: colors.secondaryText }]}> 
+                  <Text style={[styles.progressPercent, { color: colors.secondaryText }]}>
                     {progressPercent.toFixed(0)}% complete
                   </Text>
                 </>
@@ -150,7 +154,7 @@ export default function SavingsSetupScreen() {
                   size={20}
                   color={savings.isLocked ? colors.accent : colors.secondaryText}
                 />
-                <Text style={[styles.lockText, { color: colors.primaryText }]}> 
+                <Text style={[styles.lockText, { color: colors.primaryText }]}>
                   {savings.isLocked ? 'Savings locked (tap to unlock)' : 'Savings unlocked (tap to lock)'}
                 </Text>
               </TouchableOpacity>
@@ -163,10 +167,10 @@ export default function SavingsSetupScreen() {
               <Text style={[styles.sectionTitle, { color: colors.secondaryText }]}>MANAGE SAVINGS</Text>
 
               {/* Deposit */}
-              <View style={[styles.actionCard, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}> 
+              <View style={[styles.actionCard, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}>
                 <Text style={[styles.actionLabel, { color: colors.primaryText }]}>Add to Savings</Text>
                 <View style={styles.actionRow}>
-                  <View style={[styles.actionInputContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}> 
+                  <View style={[styles.actionInputContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                     <Text style={[styles.actionCurrency, { color: colors.accent }]}>$</Text>
                     <TextInput
                       style={[styles.actionInput, { color: colors.primaryText }]}
@@ -185,10 +189,10 @@ export default function SavingsSetupScreen() {
 
               {/* Withdraw */}
               {!savings.isLocked && (
-                <View style={[styles.actionCard, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}> 
+                <View style={[styles.actionCard, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}>
                   <Text style={[styles.actionLabel, { color: colors.primaryText }]}>Withdraw from Savings</Text>
                   <View style={styles.actionRow}>
-                    <View style={[styles.actionInputContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}> 
+                    <View style={[styles.actionInputContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                       <Text style={[styles.actionCurrency, { color: colors.warning }]}>$</Text>
                       <TextInput
                         style={[styles.actionInput, { color: colors.primaryText }]}
@@ -210,11 +214,11 @@ export default function SavingsSetupScreen() {
 
           {/* Goal Setup */}
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.secondaryText }]}> 
+            <Text style={[styles.sectionTitle, { color: colors.secondaryText }]}>
               {savings ? 'UPDATE GOAL' : 'SET UP SAVINGS GOAL'}
             </Text>
 
-            <View style={[styles.formCard, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}> 
+            <View style={[styles.formCard, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}>
               {/* Target Type */}
               <View style={styles.inputGroup}>
                 <Text style={[styles.label, { color: colors.secondaryText }]}>TARGET TYPE</Text>
@@ -227,7 +231,7 @@ export default function SavingsSetupScreen() {
                     ]}
                     onPress={() => setTargetType('fixed')}
                   >
-                    <Text style={[styles.typeText, { color: targetType === 'fixed' ? colors.accent : colors.secondaryText }]}> 
+                    <Text style={[styles.typeText, { color: targetType === 'fixed' ? colors.accent : colors.secondaryText }]}>
                       $ Fixed Amount
                     </Text>
                   </TouchableOpacity>
@@ -239,7 +243,7 @@ export default function SavingsSetupScreen() {
                     ]}
                     onPress={() => setTargetType('percentage')}
                   >
-                    <Text style={[styles.typeText, { color: targetType === 'percentage' ? colors.accent : colors.secondaryText }]}> 
+                    <Text style={[styles.typeText, { color: targetType === 'percentage' ? colors.accent : colors.secondaryText }]}>
                       % of Income
                     </Text>
                   </TouchableOpacity>
@@ -250,7 +254,7 @@ export default function SavingsSetupScreen() {
               {targetType === 'fixed' ? (
                 <View style={styles.inputGroup}>
                   <Text style={[styles.label, { color: colors.secondaryText }]}>MONTHLY TARGET</Text>
-                  <View style={[styles.amountContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}> 
+                  <View style={[styles.amountContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                     <Text style={[styles.currencySymbol, { color: colors.accent }]}>$</Text>
                     <TextInput
                       style={[styles.amountInput, { color: colors.primaryText }]}
@@ -265,7 +269,7 @@ export default function SavingsSetupScreen() {
               ) : (
                 <View style={styles.inputGroup}>
                   <Text style={[styles.label, { color: colors.secondaryText }]}>PERCENTAGE OF INCOME</Text>
-                  <View style={[styles.amountContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}> 
+                  <View style={[styles.amountContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                     <TextInput
                       style={[styles.amountInput, { color: colors.primaryText }]}
                       placeholder="10"
@@ -277,7 +281,7 @@ export default function SavingsSetupScreen() {
                     <Text style={[styles.currencySymbol, { color: colors.accent }]}>%</Text>
                   </View>
                   {budgetState && (
-                    <Text style={[styles.helperText, { color: colors.secondaryText }]}> 
+                    <Text style={[styles.helperText, { color: colors.secondaryText }]}>
                       = ${((budgetState.totalMonthlyIncome * (parseFloat(percentage) || 0)) / 100).toFixed(2)}/month
                     </Text>
                   )}
@@ -285,7 +289,7 @@ export default function SavingsSetupScreen() {
               )}
 
               <TouchableOpacity style={[styles.saveButton, { backgroundColor: colors.accent }]} onPress={handleSaveGoal}>
-                <Text style={[styles.saveButtonText, { color: colors.background }]}> 
+                <Text style={[styles.saveButtonText, { color: colors.background }]}>
                   {savings ? 'Update Goal' : 'Set Goal'}
                 </Text>
               </TouchableOpacity>

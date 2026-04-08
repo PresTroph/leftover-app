@@ -38,8 +38,9 @@ export default function LoginScreen() {
     try {
       await signIn(email.trim(), password);
       router.replace('/(tabs)/dashboard');
-    } catch (err: any) {
-      Alert.alert('Login Failed', err.message || 'Something went wrong');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Something went wrong';
+      Alert.alert('Login Failed', message);
     }
   };
 

@@ -1,11 +1,7 @@
-// ============================================================
-// LEFTOVER - Enhanced Auth Context
-// Real Firebase Auth + Sign in with Apple/Google
-// ============================================================
-
 'use client';
 
 import React, {
+    ReactNode,
     createContext,
     useCallback,
     useContext,
@@ -25,63 +21,93 @@ import {
 } from 'firebase/auth';
 
 import { auth } from '../config/firebase';
-import * as FirestoreService from '../services/firestore';
 import { User } from '../types';
+
+// Inline Firestore user functions to avoid circular deps
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { db } from '../config/firebase';
+
+function now(): string {
+  return new Date().toISOString();
+}
+
+async function getFirestoreUser(userId: string): Promise<User | null> {
+  const snap = await getDoc(doc(db, 'users', userId));
+  if (!snap.exists()) return null;
+  return { id: snap.id, ...snap.data() } as User;
+}
+
+async function createFirestoreUser(userId: string, data: Partial<User>): Promise<void> {
+  const user = {
+    email: data.email || '',
+    name: data.name || '',
+    language: data.language || 'en',
+    darkMode: true,
+    currency: 'USD',
+    resetDay: 1,
+    resetFrequency: 'monthly',
+    notifications: {
+      threeDaysBeforeReset: true,
+      onResetDay: true,
+      autoReset: false,
+      paydayCountdown: true,
+    },
+    subscription: {
+      status: 'trial',
+      trialStartDate: now(),
+      trialEndDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+      currentPeriodEnd: null,
+      revenueCatId: null,
+    },
+    createdAt: now(),
+    updatedAt: now(),
+  };
+  await setDoc(doc(db, 'users', userId), user);
+}
+
+async function updateFirestoreUser(userId: string, data: Partial<User>): Promise<void> {
+  const { updateDoc } = await import('firebase/firestore');
+  await updateDoc(doc(db, 'users', userId), { ...data, updatedAt: now() });
+}
 
 // ─── TYPES ──────────────────────────────────────────────────
 
 export interface AuthContextType {
-  // State
   isAuthenticated: boolean;
   isLoading: boolean;
   firebaseUser: FirebaseUser | null;
   user: User | null;
-
-  // Email/Password (existing flow from Haiku)
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
-
-  // Apple/Google (new)
   signInWithApple: (identityToken: string, fullName?: { givenName: string | null; familyName: string | null } | null) => Promise<void>;
   signInWithGoogle: (idToken: string) => Promise<void>;
-
-  // User management
   updateUserProfile: (data: Partial<User>) => Promise<void>;
 }
 
-// ─── CONTEXT ────────────────────────────────────────────────
-
 export const AuthContext = createContext<AuthContextType | null>(null);
 
-// ─── PROVIDER ───────────────────────────────────────────────
-
-export function AuthProvider({ children }: { children: React.ReactNode }) {
+export function AuthProvider({ children }: { children: ReactNode }) {
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // ── Listen for auth state changes ──
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (fbUser: FirebaseUser | null) => {
       setFirebaseUser(fbUser);
 
       if (fbUser) {
-        // Load or create user doc from Firestore
         try {
-          let userData = await FirestoreService.getUser(fbUser.uid);
-
+          let userData = await getFirestoreUser(fbUser.uid);
           if (!userData) {
-            // First time — create user doc
-            await FirestoreService.createUser(fbUser.uid, {
+            await createFirestoreUser(fbUser.uid, {
               email: fbUser.email || '',
               name: fbUser.displayName || '',
             });
-            userData = await FirestoreService.getUser(fbUser.uid);
+            userData = await getFirestoreUser(fbUser.uid);
           }
-
           setUser(userData);
-        } catch (err) {
+        } catch (err: unknown) {
           console.error('Failed to load user data:', err);
         }
       } else {
@@ -94,41 +120,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return unsubscribe;
   }, []);
 
-  // ── Email/Password Sign In ──
   const signIn = useCallback(async (email: string, password: string) => {
     setIsLoading(true);
     try {
       await signInWithEmailAndPassword(auth, email, password);
-    } catch (err: any) {
+    } catch (err: unknown) {
       setIsLoading(false);
-      throw new Error(err.message || 'Sign in failed');
+      const message = err instanceof Error ? err.message : 'Sign in failed';
+      throw new Error(message);
     }
   }, []);
 
-  // ── Email/Password Sign Up ──
   const signUp = useCallback(async (email: string, password: string) => {
     setIsLoading(true);
     try {
       const result = await createUserWithEmailAndPassword(auth, email, password);
-
-      // Create Firestore user doc
-      await FirestoreService.createUser(result.user.uid, {
+      await createFirestoreUser(result.user.uid, {
         email: result.user.email || '',
         name: result.user.displayName || '',
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       setIsLoading(false);
-      throw new Error(err.message || 'Sign up failed');
+      const message = err instanceof Error ? err.message : 'Sign up failed';
+      throw new Error(message);
     }
   }, []);
 
-  // ── Sign Out ──
-  const signOut = useCallback(async () => {
+  const handleSignOut = useCallback(async () => {
     await firebaseSignOut(auth);
     setUser(null);
   }, []);
 
-  // ── Sign In with Apple ──
   const handleSignInWithApple = useCallback(async (
     identityToken: string,
     fullName?: { givenName: string | null; familyName: string | null } | null
@@ -138,54 +160,49 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const provider = new OAuthProvider('apple.com');
       const credential = provider.credential({ idToken: identityToken });
       const result = await signInWithCredential(auth, credential);
-
-      // Check if new user
-      const existingUser = await FirestoreService.getUser(result.user.uid);
+      const existingUser = await getFirestoreUser(result.user.uid);
       if (!existingUser) {
         const name = fullName
           ? `${fullName.givenName || ''} ${fullName.familyName || ''}`.trim()
           : result.user.displayName || 'User';
-
-        await FirestoreService.createUser(result.user.uid, {
+        await createFirestoreUser(result.user.uid, {
           email: result.user.email || '',
           name,
         });
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       setIsLoading(false);
-      throw new Error(err.message || 'Apple sign in failed');
+      const message = err instanceof Error ? err.message : 'Apple sign in failed';
+      throw new Error(message);
     }
   }, []);
 
-  // ── Sign In with Google ──
   const handleSignInWithGoogle = useCallback(async (idToken: string) => {
     setIsLoading(true);
     try {
       const credential = GoogleAuthProvider.credential(idToken);
       const result = await signInWithCredential(auth, credential);
-
-      const existingUser = await FirestoreService.getUser(result.user.uid);
+      const existingUser = await getFirestoreUser(result.user.uid);
       if (!existingUser) {
-        await FirestoreService.createUser(result.user.uid, {
+        await createFirestoreUser(result.user.uid, {
           email: result.user.email || '',
           name: result.user.displayName || 'User',
         });
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       setIsLoading(false);
-      throw new Error(err.message || 'Google sign in failed');
+      const message = err instanceof Error ? err.message : 'Google sign in failed';
+      throw new Error(message);
     }
   }, []);
 
-  // ── Update User Profile ──
   const updateUserProfile = useCallback(async (data: Partial<User>) => {
     if (!firebaseUser?.uid) return;
-    await FirestoreService.updateUser(firebaseUser.uid, data);
-    const updated = await FirestoreService.getUser(firebaseUser.uid);
+    await updateFirestoreUser(firebaseUser.uid, data);
+    const updated = await getFirestoreUser(firebaseUser.uid);
     setUser(updated);
   }, [firebaseUser?.uid]);
 
-  // ── Value ──
   const value: AuthContextType = {
     isAuthenticated: !!firebaseUser,
     isLoading,
@@ -193,7 +210,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     user,
     signIn,
     signUp,
-    signOut,
+    signOut: handleSignOut,
     signInWithApple: handleSignInWithApple,
     signInWithGoogle: handleSignInWithGoogle,
     updateUserProfile,
@@ -206,9 +223,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-// ── HOOK ──
-
-export function useAuth() {
+export function useAuth(): AuthContextType {
   const context = useContext(AuthContext);
   if (!context) {
     throw new Error('useAuth must be used within an AuthProvider');

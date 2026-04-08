@@ -1,6 +1,12 @@
+// ============================================================
+// LEFTOVER - Dashboard (Enhanced)
+// Uses BudgetState from calculation engine
+// Falls back to legacy data if user isn't authed yet
+// ============================================================
+
 'use client';
 
-import { BudgetContext } from '@/src/context/BudgetContext';
+import { BudgetContext, Transaction } from '@/src/context/BudgetContext';
 import { useLanguage } from '@/src/context/LanguageContext';
 import { useTheme } from '@/src/context/ThemeContext';
 import { EXPENSE_CATEGORY_EMOJI, ExpenseCategory } from '@/src/types';
@@ -38,7 +44,7 @@ export default function DashboardScreen() {
 
   if (!budgetContext) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}> 
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
         <Text style={[styles.errorText, { color: colors.danger }]}>{t.loading}</Text>
       </SafeAreaView>
     );
@@ -48,7 +54,7 @@ export default function DashboardScreen() {
 
   // Use BudgetState if available, otherwise fall back to legacy
   const weeklyBudget = bs?.weeklyBudget || budgetContext.weeklyBudget || 300;
-  const totalSpent = bs?.currentWeekSpent || budgetContext.transactions.reduce((sum, t) => sum + (t.amount || 0), 0);
+  const totalSpent = bs?.currentWeekSpent || budgetContext.transactions.reduce((sum: number, tx: { amount: number }) => sum + (tx.amount || 0), 0);
   const budgetLeft = bs?.currentWeekRemaining ?? (weeklyBudget - totalSpent);
   const percentSpent = weeklyBudget > 0 ? (totalSpent / weeklyBudget) * 100 : 0;
 
@@ -80,7 +86,7 @@ export default function DashboardScreen() {
         date: e.date,
         id: e.id,
       }))
-    : budgetContext.transactions.map((t, i) => ({ ...t, id: String(i) }));
+    : budgetContext.transactions.map((tx: Transaction, i: number) => ({ ...tx, id: String(i) }));
 
   // Progress bar color
   const getProgressBarColor = () => {
@@ -94,14 +100,14 @@ export default function DashboardScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}> 
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Header with Greeting */}
         <View style={styles.header}>
           <View>
             <Text style={[styles.greeting, { color: colors.primaryText }]}>{greeting}</Text>
             {daysUntilPayday !== null && daysUntilPayday > 0 && (
-              <Text style={[styles.paydayText, { color: colors.secondaryText }]}> 
+              <Text style={[styles.paydayText, { color: colors.secondaryText }]}>
                 Next payday in {daysUntilPayday} day{daysUntilPayday !== 1 ? 's' : ''}
               </Text>
             )}
@@ -112,22 +118,22 @@ export default function DashboardScreen() {
         </View>
 
         {/* Weekly Budget Card */}
-        <View style={[styles.budgetCard, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}> 
+        <View style={[styles.budgetCard, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}>
           <Text style={[styles.budgetLabel, { color: colors.secondaryText }]}>{t.youHave}</Text>
-          <Text style={[styles.budgetAmount, { color: budgetLeft >= 0 ? colors.accent : colors.danger }]}> 
+          <Text style={[styles.budgetAmount, { color: budgetLeft >= 0 ? colors.accent : colors.danger }]}>
             ${Math.abs(budgetLeft).toFixed(2)}
           </Text>
           {budgetLeft < 0 && (
             <Text style={[styles.overBudgetText, { color: colors.danger }]}>over budget</Text>
           )}
           <Text style={[styles.budgetSubtitle, { color: colors.secondaryText }]}>{t.leftThisWeek}</Text>
-          <Text style={[styles.budgetInfo, { color: colors.secondaryText }]}> 
+          <Text style={[styles.budgetInfo, { color: colors.secondaryText }]}>
             {t.budget} ${weeklyBudget.toFixed(2)} {t.perWeek}
             {bs && ` · Week ${bs.currentWeekNumber}`}
           </Text>
 
           {/* Progress Bar */}
-          <View style={[styles.progressBarContainer, { backgroundColor: colors.surface }]}> 
+          <View style={[styles.progressBarContainer, { backgroundColor: colors.surface }]}>
             <View
               style={[
                 styles.progressBar,
@@ -138,7 +144,7 @@ export default function DashboardScreen() {
               ]}
             />
           </View>
-          <Text style={[styles.progressText, { color: colors.secondaryText }]}> 
+          <Text style={[styles.progressText, { color: colors.secondaryText }]}>
             {percentSpent.toFixed(0)}% {t.spent}
           </Text>
         </View>
@@ -146,21 +152,21 @@ export default function DashboardScreen() {
         {/* Monthly Overview Cards (only show if budget state exists) */}
         {bs && (
           <View style={styles.statsRow}>
-            <View style={[styles.statCard, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}> 
+            <View style={[styles.statCard, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}>
               <Text style={[styles.statLabel, { color: colors.secondaryText }]}>Monthly Income</Text>
-              <Text style={[styles.statValue, { color: colors.accent }]}> 
+              <Text style={[styles.statValue, { color: colors.accent }]}>
                 ${bs.totalMonthlyIncome.toFixed(0)}
               </Text>
             </View>
-            <View style={[styles.statCard, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}> 
+            <View style={[styles.statCard, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}>
               <Text style={[styles.statLabel, { color: colors.secondaryText }]}>Constants</Text>
-              <Text style={[styles.statValue, { color: colors.warning }]}> 
+              <Text style={[styles.statValue, { color: colors.warning }]}>
                 ${bs.totalMonthlyConstants.toFixed(0)}
               </Text>
             </View>
-            <View style={[styles.statCard, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}> 
+            <View style={[styles.statCard, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}>
               <Text style={[styles.statLabel, { color: colors.secondaryText }]}>Available</Text>
-              <Text style={[styles.statValue, { color: colors.primaryText }]}> 
+              <Text style={[styles.statValue, { color: colors.primaryText }]}>
                 ${bs.monthlyAvailable.toFixed(0)}
               </Text>
             </View>
@@ -169,14 +175,14 @@ export default function DashboardScreen() {
 
         {/* Savings Progress (only show if savings exist) */}
         {savingsTarget > 0 && (
-          <View style={[styles.savingsCard, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}> 
+          <View style={[styles.savingsCard, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}>
             <View style={styles.savingsHeader}>
               <Text style={[styles.savingsTitle, { color: colors.primaryText }]}>Savings Goal</Text>
-              <Text style={[styles.savingsAmount, { color: savingsOnTrack ? colors.accent : colors.warning }]}> 
+              <Text style={[styles.savingsAmount, { color: savingsOnTrack ? colors.accent : colors.warning }]}>
                 ${savingsCurrent.toFixed(0)} / ${savingsTarget.toFixed(0)}
               </Text>
             </View>
-            <View style={[styles.progressBarContainer, { backgroundColor: colors.surface }]}> 
+            <View style={[styles.progressBarContainer, { backgroundColor: colors.surface }]}>
               <View
                 style={[
                   styles.progressBar,
@@ -194,13 +200,13 @@ export default function DashboardScreen() {
         {recommendations.length > 0 && (
           <View style={styles.recommendationsContainer}>
             <Text style={[styles.sectionTitle, { color: colors.primaryText }]}>Insights</Text>
-            {recommendations.map((rec, index) => (
+            {recommendations.map((rec: string, index: number) => (
               <View
                 key={index}
                 style={[styles.recommendationCard, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}
               >
                 <Text style={styles.recommendationIcon}>💡</Text>
-                <Text style={[styles.recommendationText, { color: colors.secondaryText }]}> 
+                <Text style={[styles.recommendationText, { color: colors.secondaryText }]}>
                   {rec}
                 </Text>
               </View>
@@ -218,28 +224,28 @@ export default function DashboardScreen() {
 
         {/* Transactions List */}
         <View style={styles.transactionsContainer}>
-          <Text style={[styles.sectionTitle, { color: colors.primaryText }]}> 
+          <Text style={[styles.sectionTitle, { color: colors.primaryText }]}>
             {t.thisWeeksSpending}
           </Text>
           {displayTransactions.length === 0 ? (
-            <Text style={[styles.emptyText, { color: colors.secondaryText }]}> 
+            <Text style={[styles.emptyText, { color: colors.secondaryText }]}>
               {t.noExpensesYet} {t.addOneToGetStarted}
             </Text>
           ) : (
-            displayTransactions.map((item, index) => (
+            displayTransactions.map((item: { id: string; amount: number; description: string; category: string; date: string }, index: number) => (
               <View key={item.id || index} style={styles.transactionItem}>
                 <Text style={styles.transactionIcon}>
                   {CATEGORIES[item.category] || EXPENSE_CATEGORY_EMOJI[item.category as ExpenseCategory] || '📌'}
                 </Text>
                 <View style={styles.transactionInfo}>
-                  <Text style={[styles.transactionTitle, { color: colors.primaryText }]}> 
+                  <Text style={[styles.transactionTitle, { color: colors.primaryText }]}>
                     {item.description}
                   </Text>
-                  <Text style={[styles.transactionDate, { color: colors.secondaryText }]}> 
+                  <Text style={[styles.transactionDate, { color: colors.secondaryText }]}>
                     {new Date(item.date).toLocaleDateString()}
                   </Text>
                 </View>
-                <Text style={[styles.transactionAmount, { color: colors.accent }]}> 
+                <Text style={[styles.transactionAmount, { color: colors.accent }]}>
                   ${item.amount.toFixed(2)}
                 </Text>
               </View>
@@ -265,8 +271,8 @@ function PaywallModal({ visible, onClose }: { visible: boolean; onClose: () => v
 
   return (
     <Modal visible={visible} transparent animationType="slide">
-      <View style={[paywallStyles.overlay, { backgroundColor: 'rgba(0, 0, 0, 0.8)' }]}> 
-        <View style={[paywallStyles.modal, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}> 
+      <View style={[paywallStyles.overlay, { backgroundColor: 'rgba(0, 0, 0, 0.8)' }]}>
+        <View style={[paywallStyles.modal, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}>
           <TouchableOpacity style={paywallStyles.closeButton} onPress={onClose}>
             <Ionicons name="close" size={24} color={colors.primaryText} />
           </TouchableOpacity>
@@ -293,7 +299,7 @@ function PaywallModal({ visible, onClose }: { visible: boolean; onClose: () => v
             ))}
           </View>
 
-          <View style={[paywallStyles.pricingBox, { backgroundColor: colors.surface }]}> 
+          <View style={[paywallStyles.pricingBox, { backgroundColor: colors.surface }]}>
             <Text style={[paywallStyles.pricingHighlight, { color: colors.accent }]}>{t.daysFree}</Text>
             <Text style={[paywallStyles.pricingSubtitle, { color: colors.primaryText }]}>{t.thenPerWeek}</Text>
             <Text style={[paywallStyles.pricingSmall, { color: colors.secondaryText }]}>{t.noCommitment}</Text>

@@ -1,3 +1,8 @@
+// ============================================================
+// LEFTOVER - Onboarding Screen
+// Carousel → Auth (no more skip-to-dashboard)
+// ============================================================
+
 'use client';
 
 import { useLanguage } from '@/src/context/LanguageContext';
@@ -47,7 +52,6 @@ export default function OnboardingScreen() {
   const scrollViewRef = useRef<ScrollView>(null);
   const autoAdvanceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Auto-advance carousel
   useEffect(() => {
     startAutoAdvance();
     return () => {
@@ -69,7 +73,7 @@ export default function OnboardingScreen() {
   };
 
   const handleScroll = (event: any) => {
-    const newIndex = Math.round((event as any).nativeEvent.contentOffset.x / width);
+    const newIndex = Math.round(event.nativeEvent.contentOffset.x / width);
     if (newIndex !== currentIndex) {
       setCurrentIndex(newIndex);
     }
@@ -122,7 +126,7 @@ export default function OnboardingScreen() {
         ))}
       </View>
 
-      {/* Button */}
+      {/* Get Started Button */}
       <TouchableOpacity
         style={[styles.button, { backgroundColor: colors.accent }]}
         onPress={handleGetStarted}
@@ -135,7 +139,7 @@ export default function OnboardingScreen() {
       </TouchableOpacity>
 
       <TouchableOpacity style={styles.loginLink} onPress={handleLogin}>
-        <Text style={[styles.loginLinkText, { color: colors.secondaryText }]}> 
+        <Text style={[styles.loginLinkText, { color: colors.secondaryText }]}>
           Already have an account?{' '}
         </Text>
         <Text style={[styles.loginLinkAccent, { color: colors.accent }]}>Sign In</Text>

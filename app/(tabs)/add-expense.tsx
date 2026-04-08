@@ -1,3 +1,8 @@
+// ============================================================
+// LEFTOVER - Add Expense Screen (Enhanced)
+// Writes to Firestore + legacy state
+// ============================================================
+
 'use client';
 
 import { useBudget } from '@/src/context/BudgetContext';
@@ -74,7 +79,7 @@ export default function AddExpenseScreen() {
       date: now,
       weekNumber,
       month: currentMonth,
-    }).catch((err) => console.error('Firestore write failed:', err));
+    }).catch((err: unknown) => console.error('Firestore write failed:', err));
 
     // Reset form and go back
     setAmount('');
@@ -84,7 +89,7 @@ export default function AddExpenseScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}> 
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardAvoid}
@@ -102,7 +107,7 @@ export default function AddExpenseScreen() {
           {/* Amount Input */}
           <View style={styles.section}>
             <Text style={[styles.label, { color: colors.primaryText }]}>{t.expenseAmount}</Text>
-            <View style={[styles.amountInputContainer, { borderColor: colors.border, backgroundColor: colors.cardBackground }]}> 
+            <View style={[styles.amountInputContainer, { borderColor: colors.border, backgroundColor: colors.cardBackground }]}>
               <Text style={[styles.currencySymbol, { color: colors.accent }]}>$</Text>
               <TextInput
                 style={[styles.amountInput, { color: colors.primaryText }]}
@@ -143,7 +148,7 @@ export default function AddExpenseScreen() {
                   onPress={() => setSelectedCategory(key)}
                 >
                   <Text style={styles.categoryEmoji}>{emoji}</Text>
-                  <Text style={[styles.categoryLabel, { color: selectedCategory === key ? colors.accent : colors.secondaryText }]}> 
+                  <Text style={[styles.categoryLabel, { color: selectedCategory === key ? colors.accent : colors.secondaryText }]}>
                     {t[key.toLowerCase() as keyof typeof t] || key}
                   </Text>
                 </TouchableOpacity>
@@ -153,8 +158,8 @@ export default function AddExpenseScreen() {
 
           {/* Remaining Budget Info */}
           {budgetState && (
-            <View style={[styles.budgetInfo, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}> 
-              <Text style={[styles.budgetInfoText, { color: colors.secondaryText }]}> 
+            <View style={[styles.budgetInfo, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}>
+              <Text style={[styles.budgetInfoText, { color: colors.secondaryText }]}>
                 Week {budgetState.currentWeekNumber} · ${budgetState.currentWeekRemaining.toFixed(2)} remaining this week
               </Text>
             </View>
