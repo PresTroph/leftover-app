@@ -8,8 +8,6 @@ import { Stack } from 'expo-router';
 import React, { useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
-// This component bridges AuthContext -> BudgetContext
-// It lives INSIDE both providers so it can read auth and write to budget
 function AuthBudgetBridge({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const { setUser } = useBudget();
@@ -36,11 +34,8 @@ export default function RootLayout() {
                   }}
                 >
                   <Stack.Screen name="index" />
-                  <Stack.Screen name="(auth)" />
                   <Stack.Screen name="(tabs)" />
-                  <Stack.Screen name="income-setup" options={{ animation: 'slide_from_right' }} />
-                  <Stack.Screen name="constants-setup" options={{ animation: 'slide_from_right' }} />
-                  <Stack.Screen name="savings-setup" options={{ animation: 'slide_from_right' }} />
+                  <Stack.Screen name="settings" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
                 </Stack>
               </AuthBudgetBridge>
             </BudgetProvider>
