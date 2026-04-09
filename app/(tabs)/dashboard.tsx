@@ -1,23 +1,23 @@
 'use client';
 
-import { useAuth } from '@/src/context/AuthContext';
 import { BudgetContext, Transaction } from '@/src/context/BudgetContext';
+import { useAuth } from '@/src/context/AuthContext';
 import { useLanguage } from '@/src/context/LanguageContext';
 import { useTheme } from '@/src/context/ThemeContext';
 import { EXPENSE_CATEGORY_EMOJI, ExpenseCategory } from '@/src/types';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React, { useContext } from 'react';
+import React, { useContext, useState } from 'react';
 import {
-    Alert,
-    Dimensions,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Alert,
+  Dimensions,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -146,13 +146,34 @@ export default function DashboardScreen() {
               )}
               <Text style={[styles.heroSubtitle, { color: colors.secondaryText }]}>{t.leftThisWeek}</Text>
 
+              {/* Carry-over indicator */}
+              {bs && bs.currentWeekCarryOver !== 0 && (
+                <View style={[styles.carryOverBadge, { backgroundColor: bs.currentWeekCarryOver > 0 ? colors.successMuted : colors.dangerMuted }]}>
+                  <Ionicons
+                    name={bs.currentWeekCarryOver > 0 ? 'arrow-up' : 'arrow-down'}
+                    size={12}
+                    color={bs.currentWeekCarryOver > 0 ? colors.success : colors.danger}
+                  />
+                  <Text style={[styles.carryOverText, { color: bs.currentWeekCarryOver > 0 ? colors.success : colors.danger }]}>
+                    {bs.currentWeekCarryOver > 0 ? '+' : ''}${bs.currentWeekCarryOver.toFixed(2)} from last week
+                  </Text>
+                </View>
+              )}
+
+              {/* Week dates */}
+              {bs && bs.currentWeek && (
+                <Text style={[styles.weekDates, { color: colors.tertiaryText }]}>
+                  {bs.currentWeek.startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – {bs.currentWeek.endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} · {bs.currentWeek.daysLeft} day{bs.currentWeek.daysLeft !== 1 ? 's' : ''} left
+                </Text>
+              )}
+
               <View style={styles.progressSection}>
                 <View style={styles.progressLabels}>
                   <Text style={[styles.progressLabel, { color: colors.tertiaryText }]}>
                     ${totalSpent.toFixed(0)} {t.spent}
                   </Text>
                   <Text style={[styles.progressLabel, { color: colors.tertiaryText }]}>
-                    ${weeklyBudget.toFixed(0)}{bs ? ` · Wk ${bs.currentWeekNumber}` : ''}
+                    ${(bs?.currentWeekAdjustedBudget || weeklyBudget).toFixed(0)}{bs ? ` · Wk ${bs.currentWeekNumber}` : ''}
                   </Text>
                 </View>
                 <View style={[styles.progressTrack, { backgroundColor: colors.glassBgLight }]}>
@@ -269,14 +290,14 @@ export default function DashboardScreen() {
                   onLongPress={() => handleDeleteExpense(item.id, item.description)}
                   activeOpacity={0.7}
                 >
-                  <View style={[styles.transactionIconCircle, { backgroundColor: colors.glassBgLight }]}>
+                  <View style={[styles.transactionIconCircle, { backgroundColor: colors.glassBgLight }]}> 
                     <Text style={styles.transactionEmoji}>
                       {CATEGORIES[item.category] || EXPENSE_CATEGORY_EMOJI[item.category as ExpenseCategory] || '📌'}
                     </Text>
                   </View>
                   <View style={styles.transactionInfo}>
                     <Text style={[styles.transactionName, { color: colors.primaryText }]}>{item.description}</Text>
-                    <Text style={[styles.transactionDate, { color: colors.tertiaryText }]}>
+                    <Text style={[styles.transactionDate, { color: colors.tertiaryText }]}> 
                       {new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                     </Text>
                   </View>
@@ -311,7 +332,10 @@ const styles = StyleSheet.create({
   heroCurrency: { fontSize: 28, fontWeight: '300', marginTop: 8, marginRight: 2 },
   heroAmount: { fontSize: 52, fontWeight: '800', letterSpacing: -2, lineHeight: 58 },
   overBudgetBadge: { alignSelf: 'flex-start', fontSize: 10, fontWeight: '800', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 4, letterSpacing: 1, marginTop: 4 },
-  heroSubtitle: { fontSize: 14, marginTop: 4, marginBottom: 20 },
+  heroSubtitle: { fontSize: 14, marginTop: 4, marginBottom: 4 },
+  carryOverBadge: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, gap: 4, marginTop: 4 },
+  carryOverText: { fontSize: 12, fontWeight: '600' },
+  weekDates: { fontSize: 11, marginTop: 6, marginBottom: 12 },
   progressSection: {},
   progressLabels: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
   progressLabel: { fontSize: 12, fontWeight: '600' },

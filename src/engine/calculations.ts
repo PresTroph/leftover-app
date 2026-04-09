@@ -1,69 +1,41 @@
 // ============================================================
-// LEFTOVER - Calculation Engine
-// All financial math: payday, constants, budgets, weeks
+// LEFTOVER - Calculation Engine (Enhanced)
+// Carry-over logic, week tracking, AI recommendations
 // ============================================================
 
 import {
-    BudgetState,
-    CategoryBreakdown,
-    Constant,
-    ConstantFrequency,
-    DayOfWeek,
-    Expense,
-    Income,
-    IncomeFrequency,
-    Savings,
-    WeeklyBreakdown
+  Income, IncomeFrequency, Constant, ConstantFrequency,
+  Expense, Savings, DayOfWeek, CategoryBreakdown,
+  WeeklyBreakdown, BudgetState, WeekInfo,
 } from '../types';
 
 // ─── DATE HELPERS ────────────────────────────────────────────
 
 const DAY_MAP: Record<DayOfWeek, number> = {
-  sunday: 0,
-  monday: 1,
-  tuesday: 2,
-  wednesday: 3,
-  thursday: 4,
-  friday: 5,
-  saturday: 6,
+  sunday: 0, monday: 1, tuesday: 2, wednesday: 3,
+  thursday: 4, friday: 5, saturday: 6,
 };
 
-/**
- * Get today's date at midnight (no time component).
- */
 export function getToday(): Date {
   const now = new Date();
   return new Date(now.getFullYear(), now.getMonth(), now.getDate());
 }
 
-/**
- * Format date as "YYYY-MM" for month keys.
- */
 export function formatMonthKey(date: Date): string {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');
   return `${y}-${m}`;
 }
 
-/**
- * Get the number of days in a given month.
- */
 export function getDaysInMonth(year: number, month: number): number {
   return new Date(year, month + 1, 0).getDate();
 }
 
-/**
- * Calculate days between two dates (absolute).
- */
 export function daysBetween(a: Date, b: Date): number {
   const msPerDay = 1000 * 60 * 60 * 24;
   return Math.ceil(Math.abs(b.getTime() - a.getTime()) / msPerDay);
 }
 
-/**
- * Get the next occurrence of a specific day of the week.
- * If today IS that day, returns today.
- */
 export function getNextDayOfWeek(dayOfWeek: DayOfWeek, from?: Date): Date {
   const today = from || getToday();
   const targetDay = DAY_MAP[dayOfWeek];
@@ -75,83 +47,96 @@ export function getNextDayOfWeek(dayOfWeek: DayOfWeek, from?: Date): Date {
   return result;
 }
 
-/**
- * Get the next occurrence of a specific date in a month.
- * If that date has passed this month, returns next month's date.
- * Handles months with fewer days (e.g., day 31 in a 30-day month → 30th).
- */
 export function getNextMonthlyDate(dayOfMonth: number, from?: Date): Date {
   const today = from || getToday();
   const year = today.getFullYear();
   const month = today.getMonth();
-
-  // Clamp to actual days in current month
   const daysThisMonth = getDaysInMonth(year, month);
   const clampedDay = Math.min(dayOfMonth, daysThisMonth);
   const thisMonthDate = new Date(year, month, clampedDay);
 
-  if (thisMonthDate >= today) {
-    return thisMonthDate;
-  }
+  if (thisMonthDate >= today) return thisMonthDate;
 
-  // Already passed this month, go to next month
   const nextMonth = month + 1;
   const nextYear = nextMonth > 11 ? year + 1 : year;
   const actualNextMonth = nextMonth > 11 ? 0 : nextMonth;
   const daysNextMonth = getDaysInMonth(nextYear, actualNextMonth);
-  const clampedNextDay = Math.min(dayOfMonth, daysNextMonth);
+  return new Date(nextYear, actualNextMonth, Math.min(dayOfMonth, daysNextMonth));
+}
 
-  return new Date(nextYear, actualNextMonth, clampedNextDay);
+// ─── WEEK DATE CALCULATIONS ─────────────────────────────────
+
+/**
+ * Get the start date of a specific week relative to reset day.
+ */
+export function getWeekStartDate(resetDay: number, weekNumber: number, date?: Date): Date {
+  const today = date || getToday();
+  const year = today.getFullYear();
+  const month = today.getMonth();
+  const daysInMonth = getDaysInMonth(year, month);
+  const clampedResetDay = Math.min(resetDay, daysInMonth);
+
+  let resetDate: Date;
+  if (today.getDate() >= clampedResetDay) {
+    resetDate = new Date(year, month, clampedResetDay);
+  } else {
+    const prevMonth = month === 0 ? 11 : month - 1;
+    const prevYear = month === 0 ? year - 1 : year;
+    const daysInPrevMonth = getDaysInMonth(prevYear, prevMonth);
+    resetDate = new Date(prevYear, prevMonth, Math.min(resetDay, daysInPrevMonth));
+  }
+
+  const weekStart = new Date(resetDate);
+  weekStart.setDate(weekStart.getDate() + (weekNumber - 1) * 7);
+  return weekStart;
+}
+
+/**
+ * Get the end date of a specific week (6 days after start).
+ */
+export function getWeekEndDate(resetDay: number, weekNumber: number, date?: Date): Date {
+  const start = getWeekStartDate(resetDay, weekNumber, date);
+  const end = new Date(start);
+  end.setDate(end.getDate() + 6);
+  return end;
+}
+
+/**
+ * Get days remaining in the current week.
+ */
+export function getDaysLeftInWeek(resetDay: number, date?: Date): number {
+  const today = date || getToday();
+  const weekNumber = getCurrentWeekNumber(resetDay, today);
+  const endDate = getWeekEndDate(resetDay, weekNumber, today);
+  return Math.max(0, daysBetween(today, endDate));
 }
 
 // ─── INCOME CALCULATIONS ────────────────────────────────────
 
-/**
- * Calculate the monthly total for an income source based on its frequency.
- * - Weekly: amount × 4.33
- * - Bi-weekly: amount × 2.167
- * - Semi-monthly: amount × 2
- * - Monthly: amount × 1
- */
 export function calculateMonthlyIncome(amount: number, type: IncomeFrequency): number {
   switch (type) {
-    case 'weekly':
-      return Math.round(amount * 4.33 * 100) / 100;
-    case 'bi-weekly':
-      return Math.round(amount * 2.167 * 100) / 100;
-    case 'semi-monthly':
-      return Math.round(amount * 2 * 100) / 100;
-    case 'monthly':
-      return amount;
+    case 'weekly': return Math.round(amount * 4.33 * 100) / 100;
+    case 'bi-weekly': return Math.round(amount * 2.167 * 100) / 100;
+    case 'semi-monthly': return Math.round(amount * 2 * 100) / 100;
+    case 'monthly': return amount;
   }
 }
 
-/**
- * Calculate the next payday for a given income source.
- */
 export function calculateNextPayday(income: Income): Date {
   const today = getToday();
-
   switch (income.type) {
     case 'weekly': {
       if (!income.dayOfWeek) throw new Error('Weekly income requires dayOfWeek');
       return getNextDayOfWeek(income.dayOfWeek, today);
     }
-
     case 'bi-weekly': {
       if (!income.dayOfWeek) throw new Error('Bi-weekly income requires dayOfWeek');
-      // Find next occurrence of the day, then check if it's an "on" week
-      // We use the createdAt as the anchor point for bi-weekly cycle
       const anchor = new Date(income.createdAt);
       const nextDay = getNextDayOfWeek(income.dayOfWeek, today);
       const weeksDiff = Math.floor(daysBetween(anchor, nextDay) / 7);
-      // If odd number of weeks from anchor, skip to next week
-      if (weeksDiff % 2 !== 0) {
-        nextDay.setDate(nextDay.getDate() + 7);
-      }
+      if (weeksDiff % 2 !== 0) nextDay.setDate(nextDay.getDate() + 7);
       return nextDay;
     }
-
     case 'semi-monthly': {
       if (!income.semiMonthlyDates) throw new Error('Semi-monthly income requires dates');
       const [date1, date2] = income.semiMonthlyDates;
@@ -159,7 +144,6 @@ export function calculateNextPayday(income: Income): Date {
       const next2 = getNextMonthlyDate(date2, today);
       return next1 <= next2 ? next1 : next2;
     }
-
     case 'monthly': {
       if (!income.monthlyDate) throw new Error('Monthly income requires monthlyDate');
       return getNextMonthlyDate(income.monthlyDate, today);
@@ -167,24 +151,14 @@ export function calculateNextPayday(income: Income): Date {
   }
 }
 
-/**
- * Calculate total monthly income from all active income sources.
- */
 export function calculateTotalMonthlyIncome(incomes: Income[]): number {
-  return incomes
-    .filter((i) => i.active)
-    .reduce((sum, i) => sum + calculateMonthlyIncome(i.amount, i.type), 0);
+  return incomes.filter((i) => i.active).reduce((sum, i) => sum + calculateMonthlyIncome(i.amount, i.type), 0);
 }
 
-/**
- * Get the soonest next payday across all income sources.
- */
 export function getNextPaydayAcrossAll(incomes: Income[]): { date: Date; daysUntil: number; incomeName: string } | null {
   const active = incomes.filter((i) => i.active);
   if (active.length === 0) return null;
-
   let soonest: { date: Date; daysUntil: number; incomeName: string } | null = null;
-
   for (const income of active) {
     try {
       const nextDate = calculateNextPayday(income);
@@ -192,169 +166,184 @@ export function getNextPaydayAcrossAll(incomes: Income[]): { date: Date; daysUnt
       if (!soonest || days < soonest.daysUntil) {
         soonest = { date: nextDate, daysUntil: days, incomeName: income.name };
       }
-    } catch {
-      // Skip income sources with missing config
-      continue;
-    }
+    } catch { continue; }
   }
-
   return soonest;
 }
 
 // ─── CONSTANTS CALCULATIONS ─────────────────────────────────
 
-/**
- * Calculate the monthly total for a recurring constant.
- * - Weekly: amount × 4.33
- * - Bi-weekly: amount × 2.167
- * - Monthly: amount × 1
- */
 export function calculateMonthlyConstant(amount: number, frequency: ConstantFrequency): number {
   switch (frequency) {
-    case 'weekly':
-      return Math.round(amount * 4.33 * 100) / 100;
-    case 'bi-weekly':
-      return Math.round(amount * 2.167 * 100) / 100;
-    case 'monthly':
-      return amount;
+    case 'weekly': return Math.round(amount * 4.33 * 100) / 100;
+    case 'bi-weekly': return Math.round(amount * 2.167 * 100) / 100;
+    case 'monthly': return amount;
   }
 }
 
-/**
- * Calculate total monthly constants from all active constants.
- */
 export function calculateTotalMonthlyConstants(constants: Constant[]): number {
-  return constants
-    .filter((c) => c.active)
-    .reduce((sum, c) => sum + calculateMonthlyConstant(c.amount, c.frequency), 0);
+  return constants.filter((c) => c.active).reduce((sum, c) => sum + calculateMonthlyConstant(c.amount, c.frequency), 0);
 }
 
 // ─── BUDGET CALCULATIONS ────────────────────────────────────
 
 const WEEKS_PER_MONTH = 4.33;
 
-/**
- * Calculate the monthly available budget (after constants).
- */
 export function calculateMonthlyAvailable(totalIncome: number, totalConstants: number): number {
   return Math.round((totalIncome - totalConstants) * 100) / 100;
 }
 
-/**
- * Calculate the base weekly budget.
- */
 export function calculateWeeklyBudget(monthlyAvailable: number): number {
   return Math.round((monthlyAvailable / WEEKS_PER_MONTH) * 100) / 100;
 }
 
-/**
- * Determine which week number we're in relative to the reset day.
- * Week 1 starts on the reset day, week 2 starts 7 days later, etc.
- */
 export function getCurrentWeekNumber(resetDay: number, date?: Date): number {
   const today = date || getToday();
   const year = today.getFullYear();
   const month = today.getMonth();
-
-  // Find the reset date for the current budget month
   const daysInMonth = getDaysInMonth(year, month);
   const clampedResetDay = Math.min(resetDay, daysInMonth);
 
   let resetDate: Date;
   if (today.getDate() >= clampedResetDay) {
-    // We're past the reset day this month — current cycle started this month
     resetDate = new Date(year, month, clampedResetDay);
   } else {
-    // We haven't hit reset day yet — current cycle started last month
     const prevMonth = month === 0 ? 11 : month - 1;
     const prevYear = month === 0 ? year - 1 : year;
     const daysInPrevMonth = getDaysInMonth(prevYear, prevMonth);
-    const clampedPrev = Math.min(resetDay, daysInPrevMonth);
-    resetDate = new Date(prevYear, prevMonth, clampedPrev);
+    resetDate = new Date(prevYear, prevMonth, Math.min(resetDay, daysInPrevMonth));
   }
 
   const daysSinceReset = daysBetween(resetDate, today);
-  return Math.floor(daysSinceReset / 7) + 1; // 1-indexed
+  return Math.floor(daysSinceReset / 7) + 1;
 }
 
-/**
- * Calculate days until the next reset date.
- */
 export function getDaysUntilReset(resetDay: number, date?: Date): number {
   const today = date || getToday();
   const nextReset = getNextMonthlyDate(resetDay, today);
-  // If today IS the reset day, next reset is next month
   if (nextReset.getTime() === today.getTime()) {
     const nextMonth = today.getMonth() + 1;
     const nextYear = nextMonth > 11 ? today.getFullYear() + 1 : today.getFullYear();
     const actualMonth = nextMonth > 11 ? 0 : nextMonth;
     const daysInNext = getDaysInMonth(nextYear, actualMonth);
-    const clamped = Math.min(resetDay, daysInNext);
-    return daysBetween(today, new Date(nextYear, actualMonth, clamped));
+    return daysBetween(today, new Date(nextYear, actualMonth, Math.min(resetDay, daysInNext)));
   }
   return daysBetween(today, nextReset);
 }
 
 // ─── EXPENSE CALCULATIONS ───────────────────────────────────
 
-/**
- * Calculate category breakdown from a list of expenses.
- */
 export function calculateCategoryBreakdown(expenses: Expense[]): CategoryBreakdown {
   const breakdown: CategoryBreakdown = {};
   for (const expense of expenses) {
-    const cat = expense.category;
-    breakdown[cat] = (breakdown[cat] || 0) + expense.amount;
+    breakdown[expense.category] = (breakdown[expense.category] || 0) + expense.amount;
   }
-  // Round all values
   for (const key of Object.keys(breakdown)) {
     breakdown[key] = Math.round(breakdown[key] * 100) / 100;
   }
   return breakdown;
 }
 
-/**
- * Calculate total spending for a given week number.
- */
 export function calculateWeekSpending(expenses: Expense[], weekNumber: number): number {
-  return expenses
-    .filter((e) => e.weekNumber === weekNumber)
-    .reduce((sum, e) => sum + e.amount, 0);
+  return expenses.filter((e) => e.weekNumber === weekNumber).reduce((sum, e) => sum + e.amount, 0);
 }
 
-/**
- * Calculate total spending for the current month.
- */
 export function calculateMonthTotal(expenses: Expense[]): number {
   return Math.round(expenses.reduce((sum, e) => sum + e.amount, 0) * 100) / 100;
 }
 
+// ─── CARRY-OVER CALCULATION ─────────────────────────────────
+
 /**
- * Build the weekly breakdown for a full month.
+ * Calculate carry-over for the current week based on previous weeks' spending.
+ * - Overspend: auto-deducted from next week (negative carry-over)
+ * - Underspend: user chose what to do (carry-over, savings, or reset)
+ *   If not yet chosen, defaults to carry-over for calculation purposes.
+ * 
+ * The stored weekCarryOver on the user doc is the source of truth.
+ * This function calculates what the carry-over SHOULD be for display.
  */
-export function buildWeeklyBreakdown(
-  expenses: Expense[],
+export function calculateWeekCarryOver(
   weeklyBudget: number,
-  maxWeeks: number = 5
-): WeeklyBreakdown {
-  const breakdown: WeeklyBreakdown = {};
-  for (let w = 1; w <= maxWeeks; w++) {
-    const spent = calculateWeekSpending(expenses, w);
-    breakdown[`week${w}`] = {
-      budget: weeklyBudget,
-      spent: Math.round(spent * 100) / 100,
-      remaining: Math.round((weeklyBudget - spent) * 100) / 100,
-    };
+  expenses: Expense[],
+  currentWeekNumber: number,
+  storedCarryOver: number
+): number {
+  if (currentWeekNumber <= 1) return storedCarryOver || 0;
+
+  // Check what happened last week
+  const lastWeekSpent = calculateWeekSpending(expenses, currentWeekNumber - 1);
+  const lastWeekDiff = weeklyBudget - lastWeekSpent;
+
+  if (lastWeekDiff < 0) {
+    // Overspent last week — auto-deduct (always)
+    return Math.round(lastWeekDiff * 100) / 100;
   }
-  return breakdown;
+
+  // Underspent — use the stored carry-over from user's choice
+  // If they haven't made a choice yet, the stored value is what we use
+  return storedCarryOver || 0;
+}
+
+/**
+ * Build WeekInfo for a specific week.
+ */
+export function buildWeekInfo(
+  weekNumber: number,
+  resetDay: number,
+  weeklyBudget: number,
+  carryOver: number,
+  expenses: Expense[],
+  date?: Date
+): WeekInfo {
+  const today = date || getToday();
+  const startDate = getWeekStartDate(resetDay, weekNumber, today);
+  const endDate = getWeekEndDate(resetDay, weekNumber, today);
+  const spent = calculateWeekSpending(expenses, weekNumber);
+  const adjustedBudget = Math.round((weeklyBudget + carryOver) * 100) / 100;
+  const remaining = Math.round((adjustedBudget - spent) * 100) / 100;
+  const daysLeft = endDate >= today ? daysBetween(today, endDate) : 0;
+
+  return {
+    weekNumber,
+    startDate,
+    endDate,
+    baseBudget: weeklyBudget,
+    carryOver: Math.round(carryOver * 100) / 100,
+    adjustedBudget,
+    spent: Math.round(spent * 100) / 100,
+    remaining,
+    daysLeft,
+  };
+}
+
+/**
+ * Build previous weeks for history view.
+ */
+export function buildPreviousWeeks(
+  currentWeekNumber: number,
+  resetDay: number,
+  weeklyBudget: number,
+  expenses: Expense[]
+): WeekInfo[] {
+  const weeks: WeekInfo[] = [];
+
+  for (let w = 1; w < currentWeekNumber; w++) {
+    const spent = calculateWeekSpending(expenses, w);
+    const diff = weeklyBudget - spent;
+    // For historical weeks, carry-over is the deficit/surplus from the week before
+    const prevWeekCarry = w > 1 ? (weeks[w - 2]?.remaining || 0) : 0;
+    // Only carry over deficits automatically; surpluses depend on user choice
+    const carryOver = w > 1 && prevWeekCarry < 0 ? prevWeekCarry : 0;
+
+    weeks.push(buildWeekInfo(w, resetDay, weeklyBudget, carryOver, expenses));
+  }
+
+  return weeks;
 }
 
 // ─── SAVINGS CALCULATIONS ───────────────────────────────────
 
-/**
- * Calculate the monthly savings target.
- * If percentage-based, calculate from total income.
- */
 export function calculateSavingsTarget(savings: Savings, totalMonthlyIncome: number): number {
   if (savings.targetType === 'percentage' && savings.targetPercentage !== null) {
     return Math.round((totalMonthlyIncome * savings.targetPercentage) / 100 * 100) / 100;
@@ -362,15 +351,9 @@ export function calculateSavingsTarget(savings: Savings, totalMonthlyIncome: num
   return savings.monthlyTarget;
 }
 
-/**
- * Check if savings are on track for the month.
- * Compares current savings to prorated target based on day of month.
- */
 export function isSavingsOnTrack(
-  currentAmount: number,
-  monthlyTarget: number,
-  dayOfMonth: number,
-  daysInMonth: number
+  currentAmount: number, monthlyTarget: number,
+  dayOfMonth: number, daysInMonth: number
 ): boolean {
   const proratedTarget = (monthlyTarget / daysInMonth) * dayOfMonth;
   return currentAmount >= proratedTarget;
@@ -378,35 +361,16 @@ export function isSavingsOnTrack(
 
 // ─── AI GREETING ─────────────────────────────────────────────
 
-/**
- * Generate a time-based greeting.
- */
 export function getTimeBasedGreeting(name: string, language: 'en' | 'es' | 'fr' = 'en'): string {
   const hour = new Date().getHours();
-
   const greetings = {
-    en: {
-      morning: `Good morning, ${name}`,
-      afternoon: `Good afternoon, ${name}`,
-      evening: `Good evening, ${name}`,
-    },
-    es: {
-      morning: `Buenos días, ${name}`,
-      afternoon: `Buenas tardes, ${name}`,
-      evening: `Buenas noches, ${name}`,
-    },
-    fr: {
-      morning: `Bonjour, ${name}`,
-      afternoon: `Bon après-midi, ${name}`,
-      evening: `Bonsoir, ${name}`,
-    },
+    en: { morning: `Good morning`, afternoon: `Good afternoon`, evening: `Good evening` },
+    es: { morning: `Buenos días`, afternoon: `Buenas tardes`, evening: `Buenas noches` },
+    fr: { morning: `Bonjour`, afternoon: `Bon après-midi`, evening: `Bonsoir` },
   };
-
   const lang = greetings[language];
-
-  if (hour < 12) return lang.morning;
-  if (hour < 17) return lang.afternoon;
-  return lang.evening;
+  const base = hour < 12 ? lang.morning : hour < 17 ? lang.afternoon : lang.evening;
+  return name ? `${base}, ${name}` : base;
 }
 
 // ─── AI RECOMMENDATIONS ─────────────────────────────────────
@@ -414,39 +378,45 @@ export function getTimeBasedGreeting(name: string, language: 'en' | 'es' | 'fr' 
 export interface Recommendation {
   type: 'warning' | 'tip' | 'goal';
   message: string;
-  priority: number; // 1 = highest
+  priority: number;
 }
 
-/**
- * Generate smart recommendations based on current budget state.
- * This is the v1 engine — current month only, no multi-month comparison.
- */
 export function generateRecommendations(
-  weeklyBudget: number,
-  currentWeekSpent: number,
-  currentWeekNumber: number,
-  monthlyAvailable: number,
-  monthTotal: number,
-  categoryBreakdown: CategoryBreakdown,
-  savingsTarget: number,
-  savingsCurrent: number,
-  daysUntilReset: number
+  weeklyBudget: number, currentWeekSpent: number, currentWeekNumber: number,
+  monthlyAvailable: number, monthTotal: number, categoryBreakdown: CategoryBreakdown,
+  savingsTarget: number, savingsCurrent: number, daysUntilReset: number,
+  carryOver: number, adjustedBudget: number, daysLeftInWeek: number
 ): Recommendation[] {
   const recommendations: Recommendation[] = [];
 
-  // 1. Over-budget warning for current week
-  if (currentWeekSpent > weeklyBudget) {
-    const over = Math.round((currentWeekSpent - weeklyBudget) * 100) / 100;
+  // 1. Carry-over info
+  if (carryOver < 0) {
     recommendations.push({
       type: 'warning',
-      message: `You're $${over} over your weekly budget. Try to cut back the rest of this week.`,
+      message: `Last week's overspend reduced this week's budget by $${Math.abs(carryOver).toFixed(2)}.`,
+      priority: 1,
+    });
+  } else if (carryOver > 0) {
+    recommendations.push({
+      type: 'tip',
+      message: `$${carryOver.toFixed(2)} carried over from last week. Nice!`,
+      priority: 5,
+    });
+  }
+
+  // 2. Over-budget warning
+  if (currentWeekSpent > adjustedBudget) {
+    const over = Math.round((currentWeekSpent - adjustedBudget) * 100) / 100;
+    recommendations.push({
+      type: 'warning',
+      message: `You're $${over} over budget this week. This will reduce next week's budget.`,
       priority: 1,
     });
   }
 
-  // 2. Pace check — on track to overspend for the month?
-  const projectedMonthly = (monthTotal / Math.max(currentWeekNumber, 1)) * WEEKS_PER_MONTH;
-  if (projectedMonthly > monthlyAvailable) {
+  // 3. Monthly pace check
+  const projectedMonthly = (monthTotal / Math.max(currentWeekNumber, 1)) * 4.33;
+  if (projectedMonthly > monthlyAvailable && monthTotal > 0) {
     const overBy = Math.round((projectedMonthly - monthlyAvailable) * 100) / 100;
     recommendations.push({
       type: 'warning',
@@ -455,7 +425,7 @@ export function generateRecommendations(
     });
   }
 
-  // 3. Savings goal check
+  // 4. Savings goal
   if (savingsTarget > 0 && savingsCurrent < savingsTarget) {
     const remaining = Math.round((savingsTarget - savingsCurrent) * 100) / 100;
     const perDay = Math.round((remaining / Math.max(daysUntilReset, 1)) * 100) / 100;
@@ -466,7 +436,7 @@ export function generateRecommendations(
     });
   }
 
-  // 4. Top spending category tip
+  // 5. Top spending category
   const categories = Object.entries(categoryBreakdown).sort(([, a], [, b]) => b - a);
   if (categories.length > 0) {
     const [topCat, topAmount] = categories[0];
@@ -474,19 +444,29 @@ export function generateRecommendations(
     if (topPercent > 40) {
       recommendations.push({
         type: 'tip',
-        message: `${topCat.charAt(0).toUpperCase() + topCat.slice(1)} is ${topPercent}% of your spending. Look for ways to cut back.`,
+        message: `${topCat} is ${topPercent}% of your spending. Look for ways to cut back.`,
         priority: 4,
       });
     }
   }
 
-  // 5. Under-budget encouragement
-  if (currentWeekSpent < weeklyBudget * 0.5 && currentWeekNumber > 0) {
-    const saved = Math.round((weeklyBudget - currentWeekSpent) * 100) / 100;
+  // 6. Daily spending suggestion
+  if (daysLeftInWeek > 0 && currentWeekSpent < adjustedBudget) {
+    const dailyBudget = Math.round(((adjustedBudget - currentWeekSpent) / daysLeftInWeek) * 100) / 100;
+    recommendations.push({
+      type: 'tip',
+      message: `You can spend ~$${dailyBudget}/day for the rest of this week.`,
+      priority: 6,
+    });
+  }
+
+  // 7. Under-budget encouragement
+  if (currentWeekSpent < adjustedBudget * 0.5 && currentWeekNumber > 0) {
+    const saved = Math.round((adjustedBudget - currentWeekSpent) * 100) / 100;
     recommendations.push({
       type: 'tip',
       message: `Great pace! You have $${saved} left this week.`,
-      priority: 5,
+      priority: 7,
     });
   }
 
@@ -495,49 +475,51 @@ export function generateRecommendations(
 
 // ─── FULL BUDGET STATE BUILDER ──────────────────────────────
 
-/**
- * Build the complete BudgetState from raw Firestore data.
- * This is called whenever the context needs to recompute.
- */
 export function buildBudgetState(
-  user: { name: string; language: 'en' | 'es' | 'fr'; resetDay: number },
+  user: { name: string; language: 'en' | 'es' | 'fr'; resetDay: number; weekCarryOver?: number },
   incomes: Income[],
   constants: Constant[],
-  expenses: Expense[], // already filtered to current month
+  expenses: Expense[],
   savings: Savings | null
 ): BudgetState {
   const today = getToday();
   const currentMonth = formatMonthKey(today);
 
-  // Income
   const totalMonthlyIncome = calculateTotalMonthlyIncome(incomes);
   const nextPaydayInfo = getNextPaydayAcrossAll(incomes);
-
-  // Constants
   const totalMonthlyConstants = calculateTotalMonthlyConstants(constants);
   const activeConstants = constants.filter((c) => c.active);
 
-  // Budget
-  const monthlyAvailable = calculateMonthlyAvailable(totalMonthlyIncome, totalMonthlyConstants);
-  const weeklyBudget = calculateWeeklyBudget(monthlyAvailable);
+  const monthlyAvailableBeforeSavings = calculateMonthlyAvailable(totalMonthlyIncome, totalMonthlyConstants);
+
+  // Savings deduction — savings target reduces your spendable budget
+  const savingsTarget = savings ? calculateSavingsTarget(savings, totalMonthlyIncome) : 0;
+  const savingsCurrent = savings?.currentAmount || 0;
+  const monthlyAvailable = Math.round((monthlyAvailableBeforeSavings - savingsTarget) * 100) / 100;
+
+  const weeklyBudget = calculateWeeklyBudget(Math.max(monthlyAvailable, 0));
   const currentWeekNumber = getCurrentWeekNumber(user.resetDay);
+
+  // Carry-over logic
+  const storedCarryOver = user.weekCarryOver || 0;
+  const carryOver = calculateWeekCarryOver(weeklyBudget, expenses, currentWeekNumber, storedCarryOver);
+  const adjustedBudget = Math.round((weeklyBudget + carryOver) * 100) / 100;
+
   const currentWeekSpent = calculateWeekSpending(expenses, currentWeekNumber);
-  const currentWeekRemaining = Math.round((weeklyBudget - currentWeekSpent) * 100) / 100;
+  const currentWeekRemaining = Math.round((adjustedBudget - currentWeekSpent) * 100) / 100;
+
+  // Week info
+  const daysLeftInWeek = getDaysLeftInWeek(user.resetDay);
+  const currentWeek = buildWeekInfo(currentWeekNumber, user.resetDay, weeklyBudget, carryOver, expenses);
+  const previousWeeks = buildPreviousWeeks(currentWeekNumber, user.resetDay, weeklyBudget, expenses);
 
   // Expenses
   const currentMonthTotal = calculateMonthTotal(expenses);
   const categoryBreakdown = calculateCategoryBreakdown(expenses);
 
-  // Savings
-  const savingsTarget = savings ? calculateSavingsTarget(savings, totalMonthlyIncome) : 0;
-  const savingsCurrent = savings?.currentAmount || 0;
+  // Savings on-track check
   const savingsOnTrack = savings
-    ? isSavingsOnTrack(
-        savingsCurrent,
-        savingsTarget,
-        today.getDate(),
-        getDaysInMonth(today.getFullYear(), today.getMonth())
-      )
+    ? isSavingsOnTrack(savingsCurrent, savingsTarget, today.getDate(), getDaysInMonth(today.getFullYear(), today.getMonth()))
     : true;
 
   // Reset
@@ -546,15 +528,10 @@ export function buildBudgetState(
   // AI
   const greeting = getTimeBasedGreeting(user.name, user.language);
   const recs = generateRecommendations(
-    weeklyBudget,
-    currentWeekSpent,
-    currentWeekNumber,
-    monthlyAvailable,
-    currentMonthTotal,
-    categoryBreakdown,
-    savingsTarget,
-    savingsCurrent,
-    daysUntilReset
+    weeklyBudget, currentWeekSpent, currentWeekNumber,
+    monthlyAvailable, currentMonthTotal, categoryBreakdown,
+    savingsTarget, savingsCurrent, daysUntilReset,
+    carryOver, adjustedBudget, daysLeftInWeek
   );
 
   return {
@@ -568,6 +545,10 @@ export function buildBudgetState(
     currentWeekNumber,
     currentWeekSpent,
     currentWeekRemaining,
+    currentWeekCarryOver: carryOver,
+    currentWeekAdjustedBudget: adjustedBudget,
+    currentWeek,
+    previousWeeks,
     savingsTarget,
     savingsCurrent,
     savingsOnTrack,

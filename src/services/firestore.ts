@@ -44,7 +44,6 @@ import {
 } from '../types';
 
 import {
-    buildWeeklyBreakdown,
     calculateCategoryBreakdown,
     calculateMonthlyAvailable,
     calculateMonthlyConstant,
@@ -371,6 +370,34 @@ export async function withdrawFromSavings(userId: string, amount: number): Promi
   await updateSavings(userId, { id: 'main', currentAmount: newAmount });
 }
 
+/**
+ * Delete savings goal entirely.
+ */
+export async function deleteSavings(userId: string): Promise<void> {
+  await deleteDoc(doc(db, 'users', userId, 'savings', 'main'));
+}
+
+/**
+ * Update the week carry-over amount on the user doc.
+ * Called when a week ends and user makes their choice (carry-over, savings, reset).
+ */
+export async function updateWeekCarryOver(
+  userId: string,
+  carryOver: number,
+  lastWeekProcessed: number,
+  preference?: 'carry-over' | 'savings' | 'reset'
+): Promise<void> {
+  const updateData: Record<string, unknown> = {
+    weekCarryOver: carryOver,
+    lastWeekProcessed,
+    updatedAt: new Date().toISOString(),
+  };
+  if (preference) {
+    updateData.weekEndPreference = preference;
+  }
+  await updateDoc(doc(db, 'users', userId), updateData);
+}
+
 // ─── HISTORY / ARCHIVE OPERATIONS ───────────────────────────
 
 /**
@@ -431,7 +458,21 @@ export async function archiveMonth(
     monthlyBudget: monthlyAvailable,
     weeklyBudgetBase: weeklyBudget,
     categorySpending: calculateCategoryBreakdown(expenses),
-    weeklyBreakdown: buildWeeklyBreakdown(expenses, weeklyBudget),
+    weeklyBreakdown: (() => {
+      const breakdown: Record<string, { budget: number; spent: number; remaining: number; carryOver: number }> = {};
+      for (let week = 1; week <= 5; week++) {
+        const spent = expenses
+          .filter((expense) => expense.weekNumber === week)
+          .reduce((sum, expense) => sum + expense.amount, 0);
+        breakdown[`week${week}`] = {
+          budget: weeklyBudget,
+          spent: Math.round(spent * 100) / 100,
+          remaining: Math.round((weeklyBudget - spent) * 100) / 100,
+          carryOver: 0,
+        };
+      }
+      return breakdown;
+    })(),
     comparison,
     savingsGoalMet: savings ? savings.currentAmount >= savings.monthlyTarget : false,
     unusedBudget: Math.round((monthlyAvailable - totalExpenses) * 100) / 100,

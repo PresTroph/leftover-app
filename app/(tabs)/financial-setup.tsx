@@ -3,22 +3,21 @@
 import { useBudget } from '@/src/context/BudgetContext';
 import { useLanguage } from '@/src/context/LanguageContext';
 import { useTheme } from '@/src/context/ThemeContext';
-import { Constant, ConstantCategory, ConstantFrequency, DayOfWeek, Income, IncomeFrequency } from '@/src/types';
+import { Income, Constant, IncomeFrequency, ConstantFrequency, ConstantCategory, DayOfWeek } from '@/src/types';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useState } from 'react';
 import {
-    Alert,
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 // Cross-platform confirm — Alert.alert doesn't work on web
 const confirmAction = (title: string, message: string, onConfirm: () => void) => {
@@ -33,6 +32,7 @@ const confirmAction = (title: string, message: string, onConfirm: () => void) =>
     ]);
   }
 };
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const FREQ_OPTIONS: { key: IncomeFrequency; label: string }[] = [
   { key: 'weekly', label: 'Weekly' },
@@ -74,7 +74,7 @@ export default function FinancialSetupScreen() {
   const {
     incomes, addIncome, deleteIncome,
     constants, addConstant, deleteConstant,
-    savings, setSavings, updateSavings, addToSavings, withdrawFromSavings,
+    savings, setSavings, updateSavings, addToSavings, withdrawFromSavings, deleteSavings,
     budgetState,
   } = useBudget();
 
@@ -100,6 +100,8 @@ export default function FinancialSetupScreen() {
   // Savings form
   const [savingsAmount, setSavingsAmount] = useState('');
   const [depositAmt, setDepositAmt] = useState('');
+  const [withdrawAmt, setWithdrawAmt] = useState('');
+  const [editTargetAmt, setEditTargetAmt] = useState('');
 
   const resetIncomeForm = () => {
     setIncName(''); setIncAmount(''); setIncFreq('bi-weekly');
@@ -172,6 +174,38 @@ export default function FinancialSetupScreen() {
     }
   };
 
+  const handleWithdraw = async () => {
+    const amt = parseFloat(withdrawAmt);
+    if (isNaN(amt) || amt <= 0) return;
+    try {
+      await withdrawFromSavings(amt);
+      setWithdrawAmt('');
+    } catch (err: unknown) {
+      Alert.alert('Error', err instanceof Error ? err.message : 'Failed');
+    }
+  };
+
+  const handleEditTarget = async () => {
+    const amt = parseFloat(editTargetAmt);
+    if (isNaN(amt) || amt <= 0) return;
+    try {
+      await updateSavings({ id: 'main', monthlyTarget: amt });
+      setEditTargetAmt('');
+    } catch (err: unknown) {
+      Alert.alert('Error', err instanceof Error ? err.message : 'Failed');
+    }
+  };
+
+  const handleDeleteSavings = () => {
+    confirmAction(t.delete, `Remove your savings goal? Your saved amount will be lost.`, async () => {
+      try {
+        await deleteSavings();
+      } catch (err: unknown) {
+        Alert.alert('Error', err instanceof Error ? err.message : 'Failed');
+      }
+    });
+  };
+
   const bs = budgetState;
 
   return (
@@ -199,6 +233,15 @@ export default function FinancialSetupScreen() {
                   <Text style={[styles.summaryItem, { color: colors.secondaryText }]}>{t.monthlyConstants}</Text>
                   <Text style={[styles.summaryValue, { color: colors.warning }]}>-${bs.totalMonthlyConstants.toFixed(2)}</Text>
                 </View>
+                {bs.savingsTarget > 0 && (
+                  <>
+                    <View style={[styles.summaryDivider, { backgroundColor: colors.divider }]} />
+                    <View style={styles.summaryRow}>
+                      <Text style={[styles.summaryItem, { color: colors.secondaryText }]}>{t.savingsGoal}</Text>
+                      <Text style={[styles.summaryValue, { color: colors.success }]}>-${bs.savingsTarget.toFixed(2)}</Text>
+                    </View>
+                  </>
+                )}
                 <View style={[styles.summaryDivider, { backgroundColor: colors.divider }]} />
                 <View style={styles.summaryRow}>
                   <Text style={[styles.summaryItem, { color: colors.primaryText, fontWeight: '700' }]}>{t.availableBudget}</Text>
@@ -221,7 +264,7 @@ export default function FinancialSetupScreen() {
             </View>
 
             {incomes.map((inc: Income) => (
-              <View key={inc.id} style={[styles.itemCard, { backgroundColor: colors.glassBg, borderColor: colors.glassBorder }]}>
+              <View key={inc.id} style={[styles.itemCard, { backgroundColor: colors.glassBg, borderColor: colors.glassBorder }]}> 
                 <View style={styles.itemInfo}>
                   <Text style={[styles.itemName, { color: colors.primaryText }]}>{inc.name}</Text>
                   <Text style={[styles.itemDetail, { color: colors.secondaryText }]}>
@@ -240,7 +283,7 @@ export default function FinancialSetupScreen() {
                 <Text style={[styles.addItemText, { color: colors.accent }]}>{t.addIncome}</Text>
               </TouchableOpacity>
             ) : (
-              <View style={[styles.formCard, { backgroundColor: colors.glassBg, borderColor: colors.glassBorder }]}>
+              <View style={[styles.formCard, { backgroundColor: colors.glassBg, borderColor: colors.glassBorder }]}> 
                 <TextInput style={[styles.input, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.primaryText }]} placeholder={t.incomeName} placeholderTextColor={colors.tertiaryText} value={incName} onChangeText={setIncName} />
                 <View style={[styles.amountRow, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}> 
                   <Text style={[styles.currency, { color: colors.accent }]}>$</Text>
@@ -284,15 +327,15 @@ export default function FinancialSetupScreen() {
             )}
 
             {/* ─── CONSTANTS ─── */}
-            <View style={[styles.sectionHeader, { marginTop: 28 }]}>
-              <View style={[styles.sectionIcon, { backgroundColor: colors.warningMuted }]}>
+            <View style={[styles.sectionHeader, { marginTop: 28 }]}> 
+              <View style={[styles.sectionIcon, { backgroundColor: colors.warningMuted }]}> 
                 <Ionicons name="repeat-outline" size={18} color={colors.warning} />
               </View>
               <Text style={[styles.sectionTitle, { color: colors.primaryText }]}>{t.constantsNecessities}</Text>
             </View>
 
             {constants.map((c: Constant) => (
-              <View key={c.id} style={[styles.itemCard, { backgroundColor: colors.glassBg, borderColor: colors.glassBorder }]}>
+              <View key={c.id} style={[styles.itemCard, { backgroundColor: colors.glassBg, borderColor: colors.glassBorder }]}> 
                 <Text style={styles.itemEmoji}>{CONST_CATS.find((cat) => cat.key === c.category)?.emoji || '📌'}</Text>
                 <View style={styles.itemInfo}>
                   <Text style={[styles.itemName, { color: colors.primaryText }]}>{c.name}</Text>
@@ -312,7 +355,7 @@ export default function FinancialSetupScreen() {
                 <Text style={[styles.addItemText, { color: colors.accent }]}>{t.addConstant}</Text>
               </TouchableOpacity>
             ) : (
-              <View style={[styles.formCard, { backgroundColor: colors.glassBg, borderColor: colors.glassBorder }]}>
+              <View style={[styles.formCard, { backgroundColor: colors.glassBg, borderColor: colors.glassBorder }]}> 
                 <TextInput style={[styles.input, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.primaryText }]} placeholder={t.constantName} placeholderTextColor={colors.tertiaryText} value={constName} onChangeText={setConstName} />
                 <View style={[styles.amountRow, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}> 
                   <Text style={[styles.currency, { color: colors.accent }]}>$</Text>
@@ -348,24 +391,32 @@ export default function FinancialSetupScreen() {
             )}
 
             {/* ─── SAVINGS ─── */}
-            <View style={[styles.sectionHeader, { marginTop: 28 }]}>
-              <View style={[styles.sectionIcon, { backgroundColor: colors.successMuted }]}>
+            <View style={[styles.sectionHeader, { marginTop: 28 }]}> 
+              <View style={[styles.sectionIcon, { backgroundColor: colors.successMuted }]}> 
                 <Ionicons name="trending-up-outline" size={18} color={colors.success} />
               </View>
               <Text style={[styles.sectionTitle, { color: colors.primaryText }]}>{t.savingsGoal}</Text>
             </View>
 
             {savings && (
-              <View style={[styles.savingsDisplay, { backgroundColor: colors.glassBg, borderColor: colors.glassBorder }]}>
+              <View style={[styles.savingsDisplay, { backgroundColor: colors.glassBg, borderColor: colors.glassBorder }]}> 
                 <Text style={[styles.savingsCurrentLabel, { color: colors.tertiaryText }]}>{t.currentSavings}</Text>
                 <Text style={[styles.savingsCurrentAmount, { color: colors.accent }]}>${savings.currentAmount.toFixed(2)}</Text>
                 {savings.monthlyTarget > 0 && (
-                  <Text style={[styles.savingsGoalText, { color: colors.secondaryText }]}>
-                    {t.ofGoal} ${savings.monthlyTarget.toFixed(2)}
-                  </Text>
+                  <>
+                    <Text style={[styles.savingsGoalText, { color: colors.secondaryText }]}> 
+                      {t.ofGoal} ${savings.monthlyTarget.toFixed(2)} {t.monthly.toLowerCase()} {t.setGoal.toLowerCase()}
+                    </Text>
+                    {/* Progress bar */}
+                    <View style={[styles.savingsTrack, { backgroundColor: colors.glassBgLight }]}> 
+                      <View style={[styles.savingsFill, { width: `${Math.min((savings.currentAmount / savings.monthlyTarget) * 100, 100)}%`, backgroundColor: colors.success }]} />
+                    </View>
+                  </>
                 )}
-                <View style={styles.depositRow}>
-                  <View style={[styles.depositInput, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}>
+
+                {/* Deposit */}
+                <View style={[styles.depositRow, { marginTop: 16 }]}> 
+                  <View style={[styles.depositInput, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}> 
                     <Text style={[styles.currency, { color: colors.success }]}>$</Text>
                     <TextInput style={[styles.depositTextInput, { color: colors.primaryText }]} placeholder="0" placeholderTextColor={colors.tertiaryText} keyboardType="decimal-pad" value={depositAmt} onChangeText={setDepositAmt} />
                   </View>
@@ -373,11 +424,41 @@ export default function FinancialSetupScreen() {
                     <Text style={[styles.depositBtnText, { color: '#fff' }]}>{t.add}</Text>
                   </TouchableOpacity>
                 </View>
+
+                {/* Withdraw */}
+                {savings.currentAmount > 0 && (
+                  <View style={[styles.depositRow, { marginTop: 8 }]}> 
+                    <View style={[styles.depositInput, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}> 
+                      <Text style={[styles.currency, { color: colors.warning }]}>$</Text>
+                      <TextInput style={[styles.depositTextInput, { color: colors.primaryText }]} placeholder="0" placeholderTextColor={colors.tertiaryText} keyboardType="decimal-pad" value={withdrawAmt} onChangeText={setWithdrawAmt} />
+                    </View>
+                    <TouchableOpacity style={[styles.depositBtn, { backgroundColor: colors.warning }]} onPress={handleWithdraw}>
+                      <Text style={[styles.depositBtnText, { color: '#fff' }]}>{t.withdraw}</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                {/* Edit target */}
+                <View style={[styles.editTargetRow, { marginTop: 16, borderTopWidth: 1, borderTopColor: colors.divider, paddingTop: 16 }]}> 
+                  <View style={[styles.depositInput, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, flex: 1 }]}> 
+                    <Text style={[styles.currency, { color: colors.accent }]}>$</Text>
+                    <TextInput style={[styles.depositTextInput, { color: colors.primaryText }]} placeholder={savings.monthlyTarget.toString()} placeholderTextColor={colors.tertiaryText} keyboardType="decimal-pad" value={editTargetAmt} onChangeText={setEditTargetAmt} />
+                  </View>
+                  <TouchableOpacity style={[styles.depositBtn, { backgroundColor: colors.accent }]} onPress={handleEditTarget}>
+                    <Text style={[styles.depositBtnText, { color: colors.buttonText }]}>{t.updateGoal}</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Delete savings goal */}
+                <TouchableOpacity style={[styles.deleteSavingsBtn, { marginTop: 12 }]} onPress={handleDeleteSavings}>
+                  <Ionicons name="trash-outline" size={16} color={colors.danger} />
+                  <Text style={[styles.deleteSavingsText, { color: colors.danger }]}>{t.delete} {t.savingsGoal}</Text>
+                </TouchableOpacity>
               </View>
             )}
 
             {!savings && (
-              <View style={[styles.formCard, { backgroundColor: colors.glassBg, borderColor: colors.glassBorder }]}>
+              <View style={[styles.formCard, { backgroundColor: colors.glassBg, borderColor: colors.glassBorder }]}> 
                 <Text style={[styles.formSubtitle, { color: colors.secondaryText }]}>{t.monthlyTarget}</Text>
                 <View style={[styles.amountRow, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}> 
                   <Text style={[styles.currency, { color: colors.accent }]}>$</Text>
@@ -445,10 +526,15 @@ const styles = StyleSheet.create({
   savingsDisplay: { padding: 20, borderRadius: 16, borderWidth: 1, marginBottom: 8, alignItems: 'center' },
   savingsCurrentLabel: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 },
   savingsCurrentAmount: { fontSize: 32, fontWeight: '800', letterSpacing: -1 },
-  savingsGoalText: { fontSize: 13, marginTop: 2, marginBottom: 16 },
+  savingsGoalText: { fontSize: 13, marginTop: 2, marginBottom: 8 },
+  savingsTrack: { height: 6, borderRadius: 3, overflow: 'hidden', width: '100%', marginBottom: 4 },
+  savingsFill: { height: 6, borderRadius: 3 },
   depositRow: { flexDirection: 'row', gap: 8, width: '100%' },
   depositInput: { flex: 1, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 10, paddingLeft: 12 },
   depositTextInput: { flex: 1, paddingVertical: 10, fontSize: 16, fontWeight: '600' },
   depositBtn: { paddingHorizontal: 20, borderRadius: 10, justifyContent: 'center' },
   depositBtnText: { fontSize: 14, fontWeight: '700' },
+  editTargetRow: { flexDirection: 'row', gap: 8, width: '100%' },
+  deleteSavingsBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 8 },
+  deleteSavingsText: { fontSize: 13, fontWeight: '600' },
 });

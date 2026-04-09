@@ -40,6 +40,7 @@ import {
     deleteConstant as fsDeleteConstant,
     deleteExpense as fsDeleteExpense,
     deleteIncome as fsDeleteIncome,
+    deleteSavings as fsDeleteSavings,
     executeReset as fsExecuteReset,
     getConstants as fsGetConstants,
     getExpensesByMonth as fsGetExpensesByMonth,
@@ -94,6 +95,7 @@ export interface BudgetContextType {
   updateSavings: (data: UpdateSavings) => Promise<void>;
   addToSavings: (amount: number) => Promise<void>;
   withdrawFromSavings: (amount: number) => Promise<void>;
+  deleteSavings: () => Promise<void>;
   savings: Savings | null;
 
   refreshBudget: () => Promise<void>;
@@ -463,6 +465,18 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const deleteSavingsGoal = useCallback(async () => {
+    const uid = getUserId();
+    if (!uid) return;
+    try {
+      await fsDeleteSavings(uid);
+      dispatch({ type: 'SET_SAVINGS', payload: null });
+    } catch (err: unknown) {
+      console.error('[Budget] deleteSavings error:', err);
+      throw err;
+    }
+  }, []);
+
   // ── Reset ──
   const executeResetAction = useCallback(async (action: 'carry-over' | 'savings' | 'weekly-boost') => {
     const uid = getUserId();
@@ -509,6 +523,7 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
     updateSavings: updateSavingsGoal,
     addToSavings: addToSavingsAmount,
     withdrawFromSavings: withdrawFromSavingsAmount,
+    deleteSavings: deleteSavingsGoal,
 
     refreshBudget,
     executeReset: executeResetAction,
