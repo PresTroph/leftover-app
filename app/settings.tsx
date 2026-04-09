@@ -8,6 +8,7 @@ import { useRouter } from 'expo-router';
 import React from 'react';
 import {
     Alert,
+    Platform,
     ScrollView,
     StyleSheet,
     Switch,
@@ -24,17 +25,21 @@ export default function SettingsScreen() {
   const { signOut, user } = useAuth();
 
   const handleLogout = () => {
-    Alert.alert(t.logout, t.logoutConfirm, [
-      { text: t.cancel, style: 'cancel' },
-      {
-        text: t.logout,
-        style: 'destructive',
-        onPress: async () => {
-          await signOut();
-          router.replace('/');
-        },
-      },
-    ]);
+    const doLogout = async () => {
+      await signOut();
+      router.replace('/');
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm(`${t.logout}\n${t.logoutConfirm}`)) {
+        doLogout();
+      }
+    } else {
+      Alert.alert(t.logout, t.logoutConfirm, [
+        { text: t.cancel, style: 'cancel' },
+        { text: t.logout, style: 'destructive', onPress: doLogout },
+      ]);
+    }
   };
 
   return (

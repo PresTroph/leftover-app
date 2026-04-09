@@ -12,6 +12,7 @@ import React, { useContext } from 'react';
 import {
     Alert,
     Dimensions,
+    Platform,
     ScrollView,
     StyleSheet,
     Text,
@@ -75,21 +76,25 @@ export default function DashboardScreen() {
   };
 
   const handleDeleteExpense = (expenseId: string, description: string) => {
-    Alert.alert(t.delete, `Remove "${description}"?`, [
-      { text: t.cancel, style: 'cancel' },
-      {
-        text: t.delete,
-        style: 'destructive',
-        onPress: () => {
-          if (bs) {
-            budgetContext.deleteExpenseFromFirestore(expenseId);
-          } else {
-            const idx = parseInt(expenseId);
-            if (!isNaN(idx)) budgetContext.deleteTransaction(idx);
-          }
-        },
-      },
-    ]);
+    const doDelete = () => {
+      if (bs) {
+        budgetContext.deleteExpenseFromFirestore(expenseId);
+      } else {
+        const idx = parseInt(expenseId);
+        if (!isNaN(idx)) budgetContext.deleteTransaction(idx);
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm(`${t.delete}\nRemove "${description}"?`)) {
+        doDelete();
+      }
+    } else {
+      Alert.alert(t.delete, `Remove "${description}"?`, [
+        { text: t.cancel, style: 'cancel' },
+        { text: t.delete, style: 'destructive', onPress: doDelete },
+      ]);
+    }
   };
 
   return (

@@ -7,6 +7,7 @@ import React, {
     useContext,
     useEffect,
     useReducer,
+    useRef,
 } from 'react';
 
 import {
@@ -48,10 +49,10 @@ import {
     updateConstant as fsUpdateConstant,
     updateIncome as fsUpdateIncome,
     updateSavings as fsUpdateSavings,
-    withdrawFromSavings as fsWithdrawFromSavings
+    withdrawFromSavings as fsWithdrawFromSavings,
 } from '../services/firestore';
 
-// ─── LEGACY SUPPORT ─────────────────────────────────────────
+// ─── LEGACY ─────────────────────────────────────────────────
 
 export interface Transaction {
   amount: number;
@@ -63,7 +64,6 @@ export interface Transaction {
 // ─── CONTEXT TYPE ───────────────────────────────────────────
 
 export interface BudgetContextType {
-  // Legacy
   weeklyBudget: number;
   transactions: Transaction[];
   language: string;
@@ -72,7 +72,6 @@ export interface BudgetContextType {
   deleteTransaction: (index: number) => void;
   setLanguage: (lang: string) => void;
 
-  // New
   budgetState: BudgetState | null;
   isLoading: boolean;
   error: string | null;
@@ -104,7 +103,7 @@ export interface BudgetContextType {
 
 // ─── STATE ──────────────────────────────────────────────────
 
-interface BudgetReducerState {
+interface State {
   weeklyBudget: number;
   transactions: Transaction[];
   language: string;
@@ -118,7 +117,7 @@ interface BudgetReducerState {
   error: string | null;
 }
 
-const initialState: BudgetReducerState = {
+const initialState: State = {
   weeklyBudget: 300,
   transactions: [],
   language: 'English',
@@ -132,8 +131,6 @@ const initialState: BudgetReducerState = {
   error: null,
 };
 
-// ─── ACTIONS ────────────────────────────────────────────────
-
 type Action =
   | { type: 'SET_BUDGET'; payload: number }
   | { type: 'ADD_TRANSACTION'; payload: Transaction }
@@ -142,23 +139,21 @@ type Action =
   | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'SET_ERROR'; payload: string | null }
   | { type: 'SET_USER'; payload: User | null }
+  | { type: 'LOAD_DATA'; payload: { incomes: Income[]; constants: Constant[]; expenses: Expense[]; savings: Savings | null } }
   | { type: 'SET_INCOMES'; payload: Income[] }
   | { type: 'SET_CONSTANTS'; payload: Constant[] }
   | { type: 'SET_EXPENSES'; payload: Expense[] }
   | { type: 'SET_SAVINGS'; payload: Savings | null }
   | { type: 'SET_BUDGET_STATE'; payload: BudgetState };
 
-function budgetReducer(state: BudgetReducerState, action: Action): BudgetReducerState {
+function reducer(state: State, action: Action): State {
   switch (action.type) {
     case 'SET_BUDGET':
       return { ...state, weeklyBudget: action.payload };
     case 'ADD_TRANSACTION':
       return { ...state, transactions: [...state.transactions, action.payload] };
     case 'DELETE_TRANSACTION':
-      return {
-        ...state,
-        transactions: state.transactions.filter((_: Transaction, i: number) => i !== action.payload),
-      };
+      return { ...state, transactions: state.transactions.filter((_: Transaction, i: number) => i !== action.payload) };
     case 'SET_LANGUAGE':
       return { ...state, language: action.payload };
     case 'SET_LOADING':
@@ -167,6 +162,16 @@ function budgetReducer(state: BudgetReducerState, action: Action): BudgetReducer
       return { ...state, error: action.payload };
     case 'SET_USER':
       return { ...state, user: action.payload };
+    case 'LOAD_DATA':
+      return {
+        ...state,
+        incomes: action.payload.incomes,
+        constants: action.payload.constants,
+        expenses: action.payload.expenses,
+        savings: action.payload.savings,
+        isLoading: false,
+        error: null,
+      };
     case 'SET_INCOMES':
       return { ...state, incomes: action.payload };
     case 'SET_CONSTANTS':
@@ -176,11 +181,7 @@ function budgetReducer(state: BudgetReducerState, action: Action): BudgetReducer
     case 'SET_SAVINGS':
       return { ...state, savings: action.payload };
     case 'SET_BUDGET_STATE':
-      return {
-        ...state,
-        budgetState: action.payload,
-        weeklyBudget: action.payload.weeklyBudget,
-      };
+      return { ...state, budgetState: action.payload, weeklyBudget: action.payload.weeklyBudget };
     default:
       return state;
   }
@@ -193,16 +194,70 @@ export const BudgetContext = createContext<BudgetContextType | null>(null);
 // ─── PROVIDER ───────────────────────────────────────────────
 
 export function BudgetProvider({ children }: { children: ReactNode }) {
-  const [state, dispatch] = useReducer(budgetReducer, initialState);
+  const [state, dispatch] = useReducer(reducer, initialState);
 
-  // Recompute budget state whenever data changes
+  // Use refs to avoid stale closures in callbacks
+  const userRef = useRef<User | null>(null);
+
+  // Keep ref in sync with state
   useEffect(() => {
-    if (state.user) {
+    userRef.current = state.user;
+  }, [state.user]);
+
+  // ── Helper: get userId safely ──
+  const getUserId = (): string | null => {
+    return userRef.current?.id || null;
+  };
+
+  // ── Core data loader ──
+  const loadAllData = useCallback(async (userId: string) => {
+    console.log('[Budget] Loading all data for user:', userId);
+    dispatch({ type: 'SET_LOADING', payload: true });
+
+    try {
+      const currentMonth = formatMonthKey(getToday());
+      const [incomes, constants, expenses, savings] = await Promise.all([
+        fsGetIncomes(userId),
+        fsGetConstants(userId),
+        fsGetExpensesByMonth(userId, currentMonth),
+        fsGetSavings(userId),
+      ]);
+
+      console.log('[Budget] Loaded:', {
+        incomes: incomes.length,
+        constants: constants.length,
+        expenses: expenses.length,
+        hasSavings: !!savings,
+      });
+
+      dispatch({
+        type: 'LOAD_DATA',
+        payload: { incomes, constants, expenses, savings },
+      });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to load data';
+      console.error('[Budget] Load error:', message);
+      dispatch({ type: 'SET_ERROR', payload: message });
+      dispatch({ type: 'SET_LOADING', payload: false });
+    }
+  }, []);
+
+  // ── Auto-load when user changes ──
+  useEffect(() => {
+    if (state.user?.id) {
+      console.log('[Budget] User set, loading data:', state.user.id);
+      loadAllData(state.user.id);
+    }
+  }, [state.user?.id, loadAllData]);
+
+  // ── Recompute budget state when data changes ──
+  useEffect(() => {
+    if (state.user && (state.incomes.length > 0 || state.constants.length > 0 || state.expenses.length > 0 || state.savings)) {
       const budgetState = buildBudgetState(
         {
-          name: state.user.name,
-          language: state.user.language,
-          resetDay: state.user.resetDay,
+          name: state.user.name || 'User',
+          language: state.user.language || 'en',
+          resetDay: state.user.resetDay || 1,
         },
         state.incomes,
         state.constants,
@@ -213,42 +268,17 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
     }
   }, [state.user, state.incomes, state.constants, state.expenses, state.savings]);
 
-  // Auto-refresh when user is set
-  useEffect(() => {
-    if (state.user?.id) {
-      refreshBudget();
-    }
-  }, [state.user?.id]);
-
-  // Load all data from Firestore
+  // ── Refresh (public, uses ref) ──
   const refreshBudget = useCallback(async () => {
-    if (!state.user?.id) return;
-
-    dispatch({ type: 'SET_LOADING', payload: true });
-    dispatch({ type: 'SET_ERROR', payload: null });
-
-    try {
-      const currentMonth = formatMonthKey(getToday());
-      const [incomes, constants, expenses, savings] = await Promise.all([
-        fsGetIncomes(state.user.id),
-        fsGetConstants(state.user.id),
-        fsGetExpensesByMonth(state.user.id, currentMonth),
-        fsGetSavings(state.user.id),
-      ]);
-
-      dispatch({ type: 'SET_INCOMES', payload: incomes });
-      dispatch({ type: 'SET_CONSTANTS', payload: constants });
-      dispatch({ type: 'SET_EXPENSES', payload: expenses });
-      dispatch({ type: 'SET_SAVINGS', payload: savings });
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to load data';
-      dispatch({ type: 'SET_ERROR', payload: message });
-    } finally {
-      dispatch({ type: 'SET_LOADING', payload: false });
+    const uid = getUserId();
+    if (!uid) {
+      console.warn('[Budget] refreshBudget called with no user');
+      return;
     }
-  }, [state.user?.id]);
+    await loadAllData(uid);
+  }, [loadAllData]);
 
-  // Legacy actions
+  // ── Legacy actions ──
   const setBudget = useCallback((budget: number) => {
     dispatch({ type: 'SET_BUDGET', payload: budget });
   }, []);
@@ -265,108 +295,188 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
     dispatch({ type: 'SET_LANGUAGE', payload: lang });
   }, []);
 
-  // Income CRUD
+  // ── Income CRUD ──
   const addIncome = useCallback(async (data: CreateIncome) => {
-    if (!state.user?.id) return;
-    await fsAddIncome(state.user.id, data);
-    const incomes = await fsGetIncomes(state.user.id);
-    dispatch({ type: 'SET_INCOMES', payload: incomes });
-  }, [state.user?.id]);
+    const uid = getUserId();
+    if (!uid) return;
+    try {
+      await fsAddIncome(uid, data);
+      const incomes = await fsGetIncomes(uid);
+      dispatch({ type: 'SET_INCOMES', payload: incomes });
+    } catch (err: unknown) {
+      console.error('[Budget] addIncome error:', err);
+      throw err;
+    }
+  }, []);
 
   const updateIncome = useCallback(async (data: UpdateIncome) => {
-    if (!state.user?.id) return;
-    await fsUpdateIncome(state.user.id, data);
-    const incomes = await fsGetIncomes(state.user.id);
-    dispatch({ type: 'SET_INCOMES', payload: incomes });
-  }, [state.user?.id]);
+    const uid = getUserId();
+    if (!uid) return;
+    try {
+      await fsUpdateIncome(uid, data);
+      const incomes = await fsGetIncomes(uid);
+      dispatch({ type: 'SET_INCOMES', payload: incomes });
+    } catch (err: unknown) {
+      console.error('[Budget] updateIncome error:', err);
+      throw err;
+    }
+  }, []);
 
   const deleteIncome = useCallback(async (incomeId: string) => {
-    if (!state.user?.id) return;
-    await fsDeleteIncome(state.user.id, incomeId);
-    const incomes = await fsGetIncomes(state.user.id);
-    dispatch({ type: 'SET_INCOMES', payload: incomes });
-  }, [state.user?.id]);
+    const uid = getUserId();
+    if (!uid) return;
+    try {
+      console.log('[Budget] Deleting income:', incomeId);
+      await fsDeleteIncome(uid, incomeId);
+      const incomes = await fsGetIncomes(uid);
+      dispatch({ type: 'SET_INCOMES', payload: incomes });
+      console.log('[Budget] Income deleted, remaining:', incomes.length);
+    } catch (err: unknown) {
+      console.error('[Budget] deleteIncome error:', err);
+      throw err;
+    }
+  }, []);
 
-  // Constants CRUD
+  // ── Constants CRUD ──
   const addConstant = useCallback(async (data: CreateConstant) => {
-    if (!state.user?.id) return;
-    await fsAddConstant(state.user.id, data);
-    const constants = await fsGetConstants(state.user.id);
-    dispatch({ type: 'SET_CONSTANTS', payload: constants });
-  }, [state.user?.id]);
+    const uid = getUserId();
+    if (!uid) return;
+    try {
+      await fsAddConstant(uid, data);
+      const constants = await fsGetConstants(uid);
+      dispatch({ type: 'SET_CONSTANTS', payload: constants });
+    } catch (err: unknown) {
+      console.error('[Budget] addConstant error:', err);
+      throw err;
+    }
+  }, []);
 
   const updateConstant = useCallback(async (data: UpdateConstant) => {
-    if (!state.user?.id) return;
-    await fsUpdateConstant(state.user.id, data);
-    const constants = await fsGetConstants(state.user.id);
-    dispatch({ type: 'SET_CONSTANTS', payload: constants });
-  }, [state.user?.id]);
+    const uid = getUserId();
+    if (!uid) return;
+    try {
+      await fsUpdateConstant(uid, data);
+      const constants = await fsGetConstants(uid);
+      dispatch({ type: 'SET_CONSTANTS', payload: constants });
+    } catch (err: unknown) {
+      console.error('[Budget] updateConstant error:', err);
+      throw err;
+    }
+  }, []);
 
   const deleteConstant = useCallback(async (constantId: string) => {
-    if (!state.user?.id) return;
-    await fsDeleteConstant(state.user.id, constantId);
-    const constants = await fsGetConstants(state.user.id);
-    dispatch({ type: 'SET_CONSTANTS', payload: constants });
-  }, [state.user?.id]);
+    const uid = getUserId();
+    if (!uid) return;
+    try {
+      console.log('[Budget] Deleting constant:', constantId);
+      await fsDeleteConstant(uid, constantId);
+      const constants = await fsGetConstants(uid);
+      dispatch({ type: 'SET_CONSTANTS', payload: constants });
+      console.log('[Budget] Constant deleted, remaining:', constants.length);
+    } catch (err: unknown) {
+      console.error('[Budget] deleteConstant error:', err);
+      throw err;
+    }
+  }, []);
 
-  // Expense CRUD
+  // ── Expenses CRUD ──
   const addExpenseToFirestore = useCallback(async (data: CreateExpense) => {
-    if (!state.user?.id) return;
-    await fsAddExpense(state.user.id, data);
-    const currentMonth = formatMonthKey(getToday());
-    const expenses = await fsGetExpensesByMonth(state.user.id, currentMonth);
-    dispatch({ type: 'SET_EXPENSES', payload: expenses });
-  }, [state.user?.id]);
+    const uid = getUserId();
+    if (!uid) return;
+    try {
+      await fsAddExpense(uid, data);
+      const currentMonth = formatMonthKey(getToday());
+      const expenses = await fsGetExpensesByMonth(uid, currentMonth);
+      dispatch({ type: 'SET_EXPENSES', payload: expenses });
+    } catch (err: unknown) {
+      console.error('[Budget] addExpense error:', err);
+      throw err;
+    }
+  }, []);
 
   const deleteExpenseFromFirestore = useCallback(async (expenseId: string) => {
-    if (!state.user?.id) return;
-    await fsDeleteExpense(state.user.id, expenseId);
-    const currentMonth = formatMonthKey(getToday());
-    const expenses = await fsGetExpensesByMonth(state.user.id, currentMonth);
-    dispatch({ type: 'SET_EXPENSES', payload: expenses });
-  }, [state.user?.id]);
+    const uid = getUserId();
+    if (!uid) return;
+    try {
+      console.log('[Budget] Deleting expense:', expenseId);
+      await fsDeleteExpense(uid, expenseId);
+      const currentMonth = formatMonthKey(getToday());
+      const expenses = await fsGetExpensesByMonth(uid, currentMonth);
+      dispatch({ type: 'SET_EXPENSES', payload: expenses });
+      console.log('[Budget] Expense deleted, remaining:', expenses.length);
+    } catch (err: unknown) {
+      console.error('[Budget] deleteExpense error:', err);
+      throw err;
+    }
+  }, []);
 
-  // Savings
+  // ── Savings ──
   const setSavingsGoal = useCallback(async (data: CreateSavings) => {
-    if (!state.user?.id) return;
-    await fsSetSavings(state.user.id, data);
-    const savings = await fsGetSavings(state.user.id);
-    dispatch({ type: 'SET_SAVINGS', payload: savings });
-  }, [state.user?.id]);
+    const uid = getUserId();
+    if (!uid) return;
+    try {
+      await fsSetSavings(uid, data);
+      const savings = await fsGetSavings(uid);
+      dispatch({ type: 'SET_SAVINGS', payload: savings });
+    } catch (err: unknown) {
+      console.error('[Budget] setSavings error:', err);
+      throw err;
+    }
+  }, []);
 
   const updateSavingsGoal = useCallback(async (data: UpdateSavings) => {
-    if (!state.user?.id) return;
-    await fsUpdateSavings(state.user.id, data);
-    const savings = await fsGetSavings(state.user.id);
-    dispatch({ type: 'SET_SAVINGS', payload: savings });
-  }, [state.user?.id]);
+    const uid = getUserId();
+    if (!uid) return;
+    try {
+      await fsUpdateSavings(uid, data);
+      const savings = await fsGetSavings(uid);
+      dispatch({ type: 'SET_SAVINGS', payload: savings });
+    } catch (err: unknown) {
+      console.error('[Budget] updateSavings error:', err);
+      throw err;
+    }
+  }, []);
 
   const addToSavingsAmount = useCallback(async (amount: number) => {
-    if (!state.user?.id) return;
-    await fsAddToSavings(state.user.id, amount);
-    const savings = await fsGetSavings(state.user.id);
-    dispatch({ type: 'SET_SAVINGS', payload: savings });
-  }, [state.user?.id]);
+    const uid = getUserId();
+    if (!uid) return;
+    try {
+      await fsAddToSavings(uid, amount);
+      const savings = await fsGetSavings(uid);
+      dispatch({ type: 'SET_SAVINGS', payload: savings });
+    } catch (err: unknown) {
+      console.error('[Budget] addToSavings error:', err);
+      throw err;
+    }
+  }, []);
 
   const withdrawFromSavingsAmount = useCallback(async (amount: number) => {
-    if (!state.user?.id) return;
-    await fsWithdrawFromSavings(state.user.id, amount);
-    const savings = await fsGetSavings(state.user.id);
-    dispatch({ type: 'SET_SAVINGS', payload: savings });
-  }, [state.user?.id]);
+    const uid = getUserId();
+    if (!uid) return;
+    try {
+      await fsWithdrawFromSavings(uid, amount);
+      const savings = await fsGetSavings(uid);
+      dispatch({ type: 'SET_SAVINGS', payload: savings });
+    } catch (err: unknown) {
+      console.error('[Budget] withdrawFromSavings error:', err);
+      throw err;
+    }
+  }, []);
 
-  // Reset
+  // ── Reset ──
   const executeResetAction = useCallback(async (action: 'carry-over' | 'savings' | 'weekly-boost') => {
-    if (!state.user?.id) return;
-    await fsExecuteReset(state.user.id, action);
-    await refreshBudget();
-  }, [state.user?.id, refreshBudget]);
+    const uid = getUserId();
+    if (!uid) return;
+    await fsExecuteReset(uid, action);
+    await loadAllData(uid);
+  }, [loadAllData]);
 
-  // Set user (called from AuthContext listener)
+  // ── Set user ──
   const setUser = useCallback((user: User | null) => {
     dispatch({ type: 'SET_USER', payload: user });
   }, []);
 
+  // ── Value ──
   const value: BudgetContextType = {
     weeklyBudget: state.budgetState?.weeklyBudget || state.weeklyBudget,
     transactions: state.transactions,

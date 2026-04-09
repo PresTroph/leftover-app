@@ -20,6 +20,20 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+// Cross-platform confirm — Alert.alert doesn't work on web
+const confirmAction = (title: string, message: string, onConfirm: () => void) => {
+  if (Platform.OS === 'web') {
+    if (window.confirm(`${title}\n${message}`)) {
+      onConfirm();
+    }
+  } else {
+    Alert.alert(title, message, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: onConfirm },
+    ]);
+  }
+};
+
 const FREQ_OPTIONS: { key: IncomeFrequency; label: string }[] = [
   { key: 'weekly', label: 'Weekly' },
   { key: 'bi-weekly', label: 'Bi-Weekly' },
@@ -214,10 +228,7 @@ export default function FinancialSetupScreen() {
                     ${inc.amount.toFixed(2)} · {inc.type} → ${inc.monthlyTotal.toFixed(2)}{t.perMonth}
                   </Text>
                 </View>
-                <TouchableOpacity onPress={() => Alert.alert(t.delete, `Remove "${inc.name}"?`, [
-                  { text: t.cancel, style: 'cancel' },
-                  { text: t.delete, style: 'destructive', onPress: () => deleteIncome(inc.id) },
-                ])}>
+                <TouchableOpacity onPress={() => confirmAction(t.delete, `Remove "${inc.name}"?`, () => deleteIncome(inc.id))}>
                   <Ionicons name="trash-outline" size={18} color={colors.danger} />
                 </TouchableOpacity>
               </View>
@@ -289,10 +300,7 @@ export default function FinancialSetupScreen() {
                     ${c.amount.toFixed(2)} · {c.frequency} → ${c.monthlyTotal.toFixed(2)}{t.perMonth}
                   </Text>
                 </View>
-                <TouchableOpacity onPress={() => Alert.alert(t.delete, `Remove "${c.name}"?`, [
-                  { text: t.cancel, style: 'cancel' },
-                  { text: t.delete, style: 'destructive', onPress: () => deleteConstant(c.id) },
-                ])}>
+                <TouchableOpacity onPress={() => confirmAction(t.delete, `Remove "${c.name}"?`, () => deleteConstant(c.id))}>
                   <Ionicons name="trash-outline" size={18} color={colors.danger} />
                 </TouchableOpacity>
               </View>
