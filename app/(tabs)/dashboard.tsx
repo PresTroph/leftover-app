@@ -1,23 +1,24 @@
 'use client';
 
-import { BudgetContext, Transaction } from '@/src/context/BudgetContext';
+import TutorialOverlay, { TutorialStep, useTutorial } from '@/src/components/TutorialOverlay';
 import { useAuth } from '@/src/context/AuthContext';
+import { BudgetContext, Transaction } from '@/src/context/BudgetContext';
 import { useLanguage } from '@/src/context/LanguageContext';
 import { useTheme } from '@/src/context/ThemeContext';
 import { EXPENSE_CATEGORY_EMOJI, ExpenseCategory } from '@/src/types';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React, { useContext, useState } from 'react';
+import React, { useContext } from 'react';
 import {
-  Alert,
-  Dimensions,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    Alert,
+    Dimensions,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -34,6 +35,46 @@ export default function DashboardScreen() {
   const { colors, isDarkMode } = useTheme();
   const { t } = useLanguage();
   const router = useRouter();
+  const { showTutorial, completeTutorial } = useTutorial();
+
+  // Tutorial steps
+  const tutorialSteps: TutorialStep[] = [
+    {
+      id: 'welcome',
+      title: t.tutorialWelcome.split('!')[0] + '!',
+      message: t.tutorialWelcome,
+      icon: '👋',
+      position: 'center',
+    },
+    {
+      id: 'budget-card',
+      title: t.weeklyBudget,
+      message: t.tutorialBudgetCard,
+      icon: '💰',
+      position: 'top',
+    },
+    {
+      id: 'stats',
+      title: t.budgetSummary,
+      message: t.tutorialStats,
+      icon: '📊',
+      position: 'center',
+    },
+    {
+      id: 'add-expense',
+      title: t.addExpense,
+      message: t.tutorialAddExpense,
+      icon: '⚡',
+      position: 'center',
+    },
+    {
+      id: 'financial-setup',
+      title: t.financialSetup,
+      message: t.tutorialFinancialSetup,
+      icon: '💰',
+      position: 'bottom',
+    },
+  ];
 
   if (!budgetContext) {
     return (
@@ -135,7 +176,7 @@ export default function DashboardScreen() {
               <Text style={[styles.heroLabel, { color: colors.tertiaryText }]}>{t.youHave}</Text>
               <View style={styles.heroAmountRow}>
                 <Text style={[styles.heroCurrency, { color: colors.accent }]}>$</Text>
-                <Text style={[styles.heroAmount, { color: colors.primaryText }, budgetLeft < 0 && { color: colors.danger }]}> 
+                <Text style={[styles.heroAmount, { color: colors.primaryText }, budgetLeft < 0 && { color: colors.danger }]}>
                   {Math.abs(budgetLeft).toFixed(2)}
                 </Text>
               </View>
@@ -234,7 +275,7 @@ export default function DashboardScreen() {
           {recommendations.length > 0 && (
             <View style={styles.insightsSection}>
               {recommendations.map((rec: string, index: number) => (
-                <View key={index} style={[styles.insightCard, { backgroundColor: colors.glassBg, borderColor: colors.glassBorder }]}> 
+                <View key={index} style={[styles.insightCard, { backgroundColor: colors.glassBg, borderColor: colors.glassBorder }]}>
                   <LinearGradient
                     colors={[`${colors.gradientStart}08`, `${colors.gradientEnd}04`]}
                     start={{ x: 0, y: 0.5 }}
@@ -290,14 +331,14 @@ export default function DashboardScreen() {
                   onLongPress={() => handleDeleteExpense(item.id, item.description)}
                   activeOpacity={0.7}
                 >
-                  <View style={[styles.transactionIconCircle, { backgroundColor: colors.glassBgLight }]}> 
+                  <View style={[styles.transactionIconCircle, { backgroundColor: colors.glassBgLight }]}>
                     <Text style={styles.transactionEmoji}>
                       {CATEGORIES[item.category] || EXPENSE_CATEGORY_EMOJI[item.category as ExpenseCategory] || '📌'}
                     </Text>
                   </View>
                   <View style={styles.transactionInfo}>
                     <Text style={[styles.transactionName, { color: colors.primaryText }]}>{item.description}</Text>
-                    <Text style={[styles.transactionDate, { color: colors.tertiaryText }]}> 
+                    <Text style={[styles.transactionDate, { color: colors.tertiaryText }]}>
                       {new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                     </Text>
                   </View>
@@ -310,6 +351,14 @@ export default function DashboardScreen() {
           <View style={{ height: 40 }} />
         </ScrollView>
       </SafeAreaView>
+
+      {/* Tutorial Overlay */}
+      {showTutorial && (
+        <TutorialOverlay
+          steps={tutorialSteps}
+          onComplete={completeTutorial}
+        />
+      )}
     </View>
   );
 }
