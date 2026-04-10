@@ -55,8 +55,9 @@
         "origin": false
       },
       "eas": {
-        "projectId": "YOUR_EAS_PROJECT_ID"
+        "projectId": "1ab7746c-bcf2-4b1a-8b49-9ba9bfbed06f"
       }
-    }
+    },
+    "owner": "leftover1"
   }
 }
