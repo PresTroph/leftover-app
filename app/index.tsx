@@ -29,7 +29,7 @@ const SLIDES = [
 const SLIDE_AUTO_ADVANCE_MS = 3000;
 
 // ── DEV MODE: Set to false when wiring RevenueCat + Sign in with Apple ──
-const DEV_MODE = true;
+const DEV_MODE = false;
 
 export default function OnboardingScreen() {
   const router = useRouter();
