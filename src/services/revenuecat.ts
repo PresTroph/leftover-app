@@ -4,12 +4,7 @@
 // ============================================================
 
 import { Platform } from 'react-native';
-import Purchases, {
-    CustomerInfo,
-    LOG_LEVEL,
-    PurchasesOffering,
-    PurchasesPackage,
-} from 'react-native-purchases';
+import type { CustomerInfo, PurchasesOffering, PurchasesPackage } from 'react-native-purchases';
 
 // ─── CONFIG ──────────────────────────────────────────────────
 
@@ -19,6 +14,10 @@ const ENTITLEMENT_ID = 'Leftover Pro';
 // ─── INITIALIZATION ──────────────────────────────────────────
 
 let isConfigured = false;
+
+function getPurchases() {
+	return require('react-native-purchases').default;
+}
 
 /**
  * Initialize RevenueCat SDK. Call once on app startup.
@@ -32,6 +31,9 @@ export async function initRevenueCat(appUserId?: string): Promise<void> {
 			return;
 		}
 
+		const Purchases = require('react-native-purchases').default;
+		const { LOG_LEVEL } = require('react-native-purchases');
+
 		Purchases.setLogLevel(LOG_LEVEL.DEBUG);
 
 		await Purchases.configure({
@@ -43,6 +45,7 @@ export async function initRevenueCat(appUserId?: string): Promise<void> {
 		console.log('[RevenueCat] Initialized successfully');
 	} catch (err: unknown) {
 		console.error('[RevenueCat] Init error:', err);
+		// Don't crash the app if RevenueCat fails to init
 	}
 }
 
@@ -53,6 +56,7 @@ export async function loginRevenueCat(appUserId: string): Promise<void> {
 	if (Platform.OS === 'web') return;
 
 	try {
+		const Purchases = getPurchases();
 		await Purchases.logIn(appUserId);
 		console.log('[RevenueCat] Logged in user:', appUserId);
 	} catch (err: unknown) {
@@ -67,6 +71,7 @@ export async function logoutRevenueCat(): Promise<void> {
 	if (Platform.OS === 'web') return;
 
 	try {
+		const Purchases = getPurchases();
 		await Purchases.logOut();
 		console.log('[RevenueCat] Logged out');
 	} catch (err: unknown) {
@@ -83,6 +88,7 @@ export async function checkSubscription(): Promise<boolean> {
 	if (Platform.OS === 'web') return true; // Allow web access for dev
 
 	try {
+		const Purchases = getPurchases();
 		const customerInfo = await Purchases.getCustomerInfo();
 		const isActive = customerInfo.entitlements.active[ENTITLEMENT_ID] !== undefined;
 		console.log('[RevenueCat] Subscription active:', isActive);
@@ -100,6 +106,7 @@ export async function getCustomerInfo(): Promise<CustomerInfo | null> {
 	if (Platform.OS === 'web') return null;
 
 	try {
+		const Purchases = getPurchases();
 		return await Purchases.getCustomerInfo();
 	} catch (err: unknown) {
 		console.error('[RevenueCat] Get customer info error:', err);
@@ -116,6 +123,7 @@ export async function getOfferings(): Promise<PurchasesOffering | null> {
 	if (Platform.OS === 'web') return null;
 
 	try {
+		const Purchases = getPurchases();
 		const offerings = await Purchases.getOfferings();
 		if (offerings.current) {
 			console.log('[RevenueCat] Current offering:', offerings.current.identifier);
@@ -166,6 +174,7 @@ export async function purchaseWeekly(): Promise<boolean> {
 	if (Platform.OS === 'web') return true;
 
 	try {
+		const Purchases = getPurchases();
 		const pkg = await getWeeklyPackage();
 		if (!pkg) {
 			console.error('[RevenueCat] No weekly package to purchase');
@@ -194,6 +203,7 @@ export async function restorePurchases(): Promise<boolean> {
 	if (Platform.OS === 'web') return true;
 
 	try {
+		const Purchases = getPurchases();
 		const customerInfo = await Purchases.restorePurchases();
 		const isActive = customerInfo.entitlements.active[ENTITLEMENT_ID] !== undefined;
 		console.log('[RevenueCat] Restore complete, active:', isActive);
