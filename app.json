@@ -17,7 +17,7 @@
     ],
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.leftover.app",
+        "bundleIdentifier": "com.leftover.budget",
       "buildNumber": "1",
       "infoPlist": {
         "NSFaceIDUsageDescription": "Use Face ID to securely sign in to your account.",
@@ -37,7 +37,7 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0a1628"
       },
-      "package": "com.leftover.app"
+        "package": "com.leftover.budget"
     },
     "web": {
       "favicon": "./assets/favicon.png",
