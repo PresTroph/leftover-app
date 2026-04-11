@@ -58,7 +58,7 @@ export default function OnboardingScreen() {
 
 	// Initialize RevenueCat on mount
 	useEffect(() => {
-		initRevenueCat();
+		initRevenueCat().catch((err) => console.warn('[RevenueCat] Init failed:', err));
 	}, []);
 
 	// If already authenticated, skip onboarding

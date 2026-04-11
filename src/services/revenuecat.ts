@@ -8,7 +8,7 @@ import type { CustomerInfo, PurchasesOffering, PurchasesPackage } from 'react-na
 
 // ─── CONFIG ──────────────────────────────────────────────────
 
-const REVENUECAT_API_KEY = 'test_HKJxnBcIkyCkbvvuM0A0idnEezP';
+const REVENUECAT_API_KEY = 'appl_poPXHFmryHmGwljLnScocJdahkO';
 const ENTITLEMENT_ID = 'Leftover Pro';
 
 // ─── INITIALIZATION ──────────────────────────────────────────
