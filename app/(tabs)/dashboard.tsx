@@ -1,24 +1,24 @@
 'use client';
 
-import { BudgetContext, Transaction } from '@/src/context/BudgetContext';
+import TutorialOverlay, { TutorialStep, useTutorial } from '@/src/components/TutorialOverlay';
 import { useAuth } from '@/src/context/AuthContext';
+import { BudgetContext, Transaction } from '@/src/context/BudgetContext';
 import { useLanguage } from '@/src/context/LanguageContext';
 import { useTheme } from '@/src/context/ThemeContext';
 import { EXPENSE_CATEGORY_EMOJI, ExpenseCategory } from '@/src/types';
-import TutorialOverlay, { useTutorial, TutorialStep } from '@/src/components/TutorialOverlay';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React, { useContext, useState } from 'react';
+import React, { useContext } from 'react';
 import {
-	Alert,
-	Dimensions,
-	Platform,
-	ScrollView,
-	StyleSheet,
-	Text,
-	TouchableOpacity,
-	View,
+    Alert,
+    Dimensions,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 

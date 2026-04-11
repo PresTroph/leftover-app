@@ -129,6 +129,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 			try {
 				const savedId = await getSavedUserId();
 				if (savedId) {
+					// Sign in anonymously to Firebase so Firestore rules work
+					const { signInAnonymously } = await import('firebase/auth');
+					const { auth } = await import('../config/firebase');
+					await signInAnonymously(auth);
+
 					const userData = await getFirestoreUser(savedId);
 					if (userData) {
 						setUserId(savedId);
@@ -152,6 +157,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 	) => {
 		setIsLoading(true);
 		try {
+			// Sign in anonymously to Firebase so Firestore security rules work
+			const { signInAnonymously } = await import('firebase/auth');
+			const { auth } = await import('../config/firebase');
+			await signInAnonymously(auth);
+
 			let userData = await getFirestoreUser(revenueCatUserId);
 			if (!userData) {
 				await createFirestoreUser(revenueCatUserId, {
