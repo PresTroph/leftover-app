@@ -15,6 +15,7 @@ import React, { useEffect, useState } from 'react';
 import {
     Animated,
     Dimensions,
+    Platform,
     StyleSheet,
     Text,
     TouchableOpacity,
@@ -42,32 +43,39 @@ export function useTutorial() {
   const [isChecked, setIsChecked] = useState(false);
 
   useEffect(() => {
-    // Check if tutorial was completed before
     let completed = false;
-    try {
-      if (typeof window !== 'undefined' && window.localStorage) {
-        completed = window.localStorage.getItem(TUTORIAL_KEY) === 'true';
+    const check = async () => {
+      try {
+        if (Platform.OS === 'web') {
+          completed = window.localStorage.getItem(TUTORIAL_KEY) === 'true';
+        } else {
+          const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
+          const val = await AsyncStorage.getItem(TUTORIAL_KEY);
+          completed = val === 'true';
+        }
+      } catch {
+        completed = false;
       }
-    } catch {
-      completed = false;
-    }
 
-    if (!completed) {
-      const timer = setTimeout(() => setShowTutorial(true), 1000);
-      return () => clearTimeout(timer);
-    }
-    setIsChecked(true);
+      if (!completed) {
+        const timer = setTimeout(() => setShowTutorial(true), 1000);
+        return () => clearTimeout(timer);
+      }
+      setIsChecked(true);
+    };
+    check();
   }, []);
 
-  const completeTutorial = () => {
+  const completeTutorial = async () => {
     setShowTutorial(false);
     try {
-      if (typeof window !== 'undefined' && window.localStorage) {
+      if (Platform.OS === 'web') {
         window.localStorage.setItem(TUTORIAL_KEY, 'true');
+      } else {
+        const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
+        await AsyncStorage.setItem(TUTORIAL_KEY, 'true');
       }
-    } catch {
-      // Silently fail
-    }
+    } catch { /* silently fail */ }
   };
 
   const resetTutorial = () => {
