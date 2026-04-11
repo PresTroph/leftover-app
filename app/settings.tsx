@@ -46,91 +46,87 @@ export default function SettingsScreen() {
 
 	return (
 		<View style={[styles.container, { backgroundColor: colors.background }]}> 
-			<SafeAreaView style={{ flex: 1 }}>
-				<ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-					{/* Header */}
-					<View style={styles.header}>
-						<Text style={[styles.title, { color: colors.primaryText }]}>{t.settings}</Text>
-						<TouchableOpacity onPress={() => router.back()}>
-							<Ionicons name="close" size={24} color={colors.secondaryText} />
-						</TouchableOpacity>
-					</View>
+			<SafeAreaView style={styles.safeArea}>
+				<View style={styles.header}>
+					<Text style={[styles.title, { color: colors.primaryText }]}>{t.settings}</Text>
+					<TouchableOpacity onPress={() => router.back()} style={styles.closeButton}>
+						<Ionicons name="close" size={24} color={colors.primaryText} />
+					</TouchableOpacity>
+				</View>
 
-					{user && (
-						<Text style={[styles.email, { color: colors.secondaryText }]}>{user.email}</Text>
-					)}
-
-					{/* Appearance */}
-					<View style={styles.section}>
-						<Text style={[styles.sectionLabel, { color: colors.tertiaryText }]}>{t.appearance}</Text>
-						<View style={[styles.card, { backgroundColor: colors.glassBg, borderColor: colors.glassBorder }]}>
-							<View style={styles.settingRow}>
-								<View style={styles.settingLeft}>
-									<Ionicons name={isDarkMode ? 'moon' : 'sunny'} size={20} color={colors.accent} />
-									<Text style={[styles.settingLabel, { color: colors.primaryText }]}>
-										{isDarkMode ? t.darkMode : t.lightMode}
-									</Text>
-								</View>
-								<Switch
-									value={isDarkMode}
-									onValueChange={toggleTheme}
-									trackColor={{ false: colors.tertiaryText, true: colors.accent }}
-									thumbColor={colors.primaryText}
-								/>
-							</View>
+				<ScrollView contentContainerStyle={styles.scrollContent}>
+					{/* Dark Mode */}
+					<View style={[styles.settingRow, { borderBottomColor: colors.divider }]}>
+						<View style={styles.settingLabel}>
+							<Ionicons name={isDarkMode ? 'moon' : 'sunny'} size={20} color={colors.accent} />
+							<Text style={[styles.settingText, { color: colors.primaryText }]}>{t.darkMode}</Text>
 						</View>
+						<Switch
+							value={isDarkMode}
+							onValueChange={toggleTheme}
+							trackColor={{ false: colors.glassBg, true: colors.accent }}
+						/>
 					</View>
 
 					{/* Language */}
-					<View style={styles.section}>
-						<Text style={[styles.sectionLabel, { color: colors.tertiaryText }]}>{t.language}</Text>
-						<View style={[styles.card, { backgroundColor: colors.glassBg, borderColor: colors.glassBorder }]}>
-							{(['en', 'es', 'fr'] as const).map((lang, idx: number) => {
-								const labels = { en: t.english, es: t.spanish, fr: t.french };
-								const flags = { en: '🇺🇸', es: '🇪🇸', fr: '🇫🇷' };
-								return (
-									<React.Fragment key={lang}>
-										{idx > 0 && <View style={[styles.divider, { backgroundColor: colors.divider }]} />}
-										<TouchableOpacity
-											style={styles.settingRow}
-											onPress={() => setLanguage(lang)}
-										>
-											<View style={styles.settingLeft}>
-												<Text style={styles.flag}>{flags[lang]}</Text>
-												<Text style={[styles.settingLabel, { color: colors.primaryText }]}>{labels[lang]}</Text>
-											</View>
-											{language === lang && (
-												<Ionicons name="checkmark" size={20} color={colors.accent} />
-											)}
-										</TouchableOpacity>
-									</React.Fragment>
-								);
-							})}
+					<View style={[styles.settingSection, { borderBottomColor: colors.divider }]}>
+						<View style={styles.settingLabel}>
+							<Ionicons name="language" size={20} color={colors.accent} />
+							<Text style={[styles.settingText, { color: colors.primaryText }]}>{t.language}</Text>
+						</View>
+						<View style={styles.languageRow}>
+							{[
+								{ code: 'en', label: '🇺🇸 English' },
+								{ code: 'es', label: '🇪🇸 Español' },
+								{ code: 'fr', label: '🇫🇷 Français' },
+							].map((lang) => (
+								<TouchableOpacity
+									key={lang.code}
+									style={[
+										styles.languageChip,
+										{
+											backgroundColor: language === lang.code ? colors.accent : colors.glassBg,
+											borderColor: language === lang.code ? colors.accent : colors.glassBorder,
+										},
+									]}
+									onPress={() => setLanguage(lang.code as 'en' | 'es' | 'fr')}
+								>
+									<Text
+										style={[
+											styles.languageChipText,
+											{ color: language === lang.code ? colors.buttonText : colors.secondaryText },
+										]}
+									>
+										{lang.label}
+									</Text>
+								</TouchableOpacity>
+							))}
 						</View>
 					</View>
 
 					{/* About */}
-					<View style={styles.section}>
-						<Text style={[styles.sectionLabel, { color: colors.tertiaryText }]}>{t.about}</Text>
-						<View style={[styles.card, { backgroundColor: colors.glassBg, borderColor: colors.glassBorder }]}>
-							<View style={styles.settingRow}>
-								<Text style={[styles.settingLabel, { color: colors.primaryText }]}>Leftover</Text>
-								<Text style={[styles.settingValue, { color: colors.secondaryText }]}>1.0.0</Text>
-							</View>
-							<View style={[styles.divider, { backgroundColor: colors.divider }]} />
-							<TouchableOpacity style={styles.settingRow}>
-								<Text style={[styles.settingLabel, { color: colors.accent }]}>{t.privacyPolicy}</Text>
-								<Ionicons name="chevron-forward" size={18} color={colors.accent} />
-							</TouchableOpacity>
+					<View style={[styles.settingRow, { borderBottomColor: colors.divider }]}>
+						<View style={styles.settingLabel}>
+							<Ionicons name="information-circle-outline" size={20} color={colors.accent} />
+							<Text style={[styles.settingText, { color: colors.primaryText }]}>{t.about}</Text>
 						</View>
+						<Text style={[styles.versionText, { color: colors.tertiaryText }]}>v1.0.0</Text>
 					</View>
 
+					{/* Account Info */}
+					{user?.email ? (
+						<View style={[styles.settingRow, { borderBottomColor: colors.divider }]}>
+							<View style={styles.settingLabel}>
+								<Ionicons name="person-outline" size={20} color={colors.accent} />
+								<Text style={[styles.settingText, { color: colors.primaryText }]}>{(t as any).account || 'Account'}</Text>
+							</View>
+							<Text style={[styles.versionText, { color: colors.tertiaryText }]}>{user.email}</Text>
+						</View>
+					) : null}
+
 					{/* Logout */}
-					<TouchableOpacity
-						style={[styles.logoutButton, { backgroundColor: colors.dangerMuted }]}
-						onPress={handleLogout}
-					>
-						<Ionicons name="log-out-outline" size={18} color={colors.danger} />
+					<TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+						<Ionicons name="log-out-outline" size={20} color={colors.danger} />
 						<Text style={[styles.logoutText, { color: colors.danger }]}>{t.logout}</Text>
 					</TouchableOpacity>
 				</ScrollView>
@@ -141,19 +137,56 @@ export default function SettingsScreen() {
 
 const styles = StyleSheet.create({
 	container: { flex: 1 },
-	scrollContent: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 40 },
-	header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
-	title: { fontSize: 28, fontWeight: '700', letterSpacing: -0.5 },
-	email: { fontSize: 14, marginBottom: 28 },
-	section: { marginBottom: 24 },
-	sectionLabel: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 },
-	card: { borderRadius: 14, borderWidth: 1, overflow: 'hidden' },
-	settingRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16 },
-	settingLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-	settingLabel: { fontSize: 15, fontWeight: '500' },
-	settingValue: { fontSize: 14 },
-	flag: { fontSize: 18 },
-	divider: { height: 1, marginHorizontal: 16 },
-	logoutButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 14, borderRadius: 14, gap: 8, marginTop: 8 },
-	logoutText: { fontSize: 15, fontWeight: '600' },
+	safeArea: { flex: 1 },
+	header: {
+		flexDirection: 'row',
+		justifyContent: 'space-between',
+		alignItems: 'center',
+		paddingHorizontal: 20,
+		paddingVertical: 16,
+	},
+	title: { fontSize: 22, fontWeight: '700' },
+	closeButton: { padding: 4 },
+	scrollContent: { paddingHorizontal: 20 },
+
+	settingRow: {
+		flexDirection: 'row',
+		justifyContent: 'space-between',
+		alignItems: 'center',
+		paddingVertical: 16,
+		borderBottomWidth: 1,
+	},
+	settingSection: {
+		paddingVertical: 16,
+		borderBottomWidth: 1,
+	},
+	settingLabel: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 12,
+	},
+	settingText: { fontSize: 16, fontWeight: '500' },
+	versionText: { fontSize: 14 },
+
+	languageRow: {
+		flexDirection: 'row',
+		gap: 8,
+		marginTop: 12,
+	},
+	languageChip: {
+		paddingHorizontal: 12,
+		paddingVertical: 8,
+		borderRadius: 8,
+		borderWidth: 1,
+	},
+	languageChipText: { fontSize: 13, fontWeight: '600' },
+
+	logoutButton: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 12,
+		paddingVertical: 20,
+		marginTop: 20,
+	},
+	logoutText: { fontSize: 16, fontWeight: '600' },
 });
