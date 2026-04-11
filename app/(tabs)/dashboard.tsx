@@ -71,7 +71,7 @@ export default function DashboardScreen() {
       id: 'financial-setup',
       title: t.financialSetup,
       message: t.tutorialFinancialSetup,
-      icon: '💰',
+      icon: '⚙️',
       position: 'bottom',
     },
   ];
@@ -91,10 +91,10 @@ export default function DashboardScreen() {
   const budgetLeft = bs?.currentWeekRemaining ?? (weeklyBudget - totalSpent);
   const percentSpent = weeklyBudget > 0 ? (totalSpent / weeklyBudget) * 100 : 0;
 
-  // Build greeting with user name
+  // Build greeting with user name - no duplication
   const hour = new Date().getHours();
   const timeGreeting = hour < 12 ? t.goodMorning : hour < 17 ? t.goodAfternoon : t.goodEvening;
-  const userName = user?.name || bs?.greeting?.split(',')[0]?.split(' ').pop() || '';
+  const userName = user?.name || '';
   const greeting = userName ? `${timeGreeting}, ${userName}` : timeGreeting;
 
   const recommendations = bs?.recommendations || [];
