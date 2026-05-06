@@ -4,11 +4,13 @@
 // ============================================================
 
 import {
+  Borrowed,
   BudgetState,
   CategoryBreakdown,
   Constant, ConstantFrequency,
   DayOfWeek,
   Expense,
+  Gift,
   Income, IncomeFrequency,
   Savings,
   WeekInfo
@@ -479,12 +481,29 @@ export function generateRecommendations(
 
 // ─── FULL BUDGET STATE BUILDER ──────────────────────────────
 
+// ============================================================
+// CHANGES TO calculations.ts
+// ============================================================
+//
+// 1. Add these imports at the top alongside existing imports:
+//
+//    import { Borrowed, Gift } from '../types';
+//
+//    (Add Borrowed and Gift to the existing import from '../types')
+//
+// 2. Replace the ENTIRE buildBudgetState function (starting from
+//    "export function buildBudgetState" to the closing "}")
+//    with the version below:
+// ============================================================
+
 export function buildBudgetState(
   user: { name: string; language: 'en' | 'es' | 'fr'; resetDay: number },
   incomes: Income[],
   constants: Constant[],
   expenses: Expense[],
-  savings: Savings | null
+  savings: Savings | null,
+  borrowed: Borrowed[] = [],
+  gifts: Gift[] = []
 ): BudgetState {
   const today = getToday();
   const currentMonth = formatMonthKey(today);
@@ -505,13 +524,25 @@ export function buildBudgetState(
 
   // AUTOMATIC carry-over: walks through all previous weeks
   const carryOver = calculateAutoCarryOver(weeklyBudget, expenses, currentWeekNumber);
-  const adjustedBudget = Math.round((weeklyBudget + carryOver) * 100) / 100;
+
+  // Gifts this week add to available
+  const giftsThisWeek = gifts.filter((g) => g.weekNumber === currentWeekNumber);
+  const totalGiftsThisWeek = giftsThisWeek.reduce((sum, g) => sum + g.amount, 0);
+
+  // Borrowed money this week adds to available
+  const activeBorrowed = borrowed.filter((b) => b.status === 'active' || b.status === 'partial');
+  const borrowedThisWeek = borrowed.filter((b) => b.weekNumber === currentWeekNumber);
+  const totalBorrowedThisWeek = borrowedThisWeek.reduce((sum, b) => sum + b.amount, 0);
+  const totalBorrowed = activeBorrowed.reduce((sum, b) => sum + (b.amount - b.paidBack), 0);
+
+  // Adjusted budget = base + carry-over + gifts this week + borrowed this week
+  const adjustedBudget = Math.round((weeklyBudget + carryOver + totalGiftsThisWeek + totalBorrowedThisWeek) * 100) / 100;
 
   const currentWeekSpent = calculateWeekSpending(expenses, currentWeekNumber);
   const currentWeekRemaining = Math.round((adjustedBudget - currentWeekSpent) * 100) / 100;
 
   const daysLeftInWeek = getDaysLeftInWeek(user.resetDay);
-  const currentWeek = buildWeekInfo(currentWeekNumber, user.resetDay, weeklyBudget, carryOver, expenses);
+  const currentWeek = buildWeekInfo(currentWeekNumber, user.resetDay, weeklyBudget, carryOver + totalGiftsThisWeek + totalBorrowedThisWeek, expenses);
   const previousWeeks = buildPreviousWeeks(currentWeekNumber, user.resetDay, weeklyBudget, expenses);
 
   const currentMonthTotal = calculateMonthTotal(expenses);
@@ -557,5 +588,10 @@ export function buildBudgetState(
     currentMonth,
     resetDay: user.resetDay,
     daysUntilReset,
+    // New: borrowed & gifts
+    totalBorrowed,
+    totalGiftsThisWeek,
+    borrowedRecords: activeBorrowed,
+    giftsThisWeek,
   };
 }

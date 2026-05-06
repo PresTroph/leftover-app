@@ -11,50 +11,56 @@
 // ============================================================
 
 import {
-    addDoc,
-    collection,
-    deleteDoc,
-    doc,
-    getDoc,
-    getDocs,
-    limit,
-    orderBy,
-    query,
-    setDoc,
-    updateDoc,
-    where
+  addDoc,
+  collection,
+  deleteDoc,
+  doc,
+  getDoc,
+  getDocs,
+  limit,
+  orderBy,
+  query,
+  setDoc,
+  updateDoc,
+  where
 } from 'firebase/firestore';
 
 import { db } from '../config/firebase';
 
 import {
-    Constant,
-    CreateConstant,
-    CreateExpense,
-    CreateIncome,
-    CreateSavings,
-    Expense,
-    HistoricalMonth,
-    Income,
-    Savings,
-    UpdateConstant,
-    UpdateIncome,
-    UpdateSavings,
-    User
+  Borrowed,
+  Constant,
+  CreateBorrowed,
+  CreateConstant,
+  CreateExpense,
+  CreateGift,
+  CreateIncome,
+  CreateSavings,
+  Expense,
+  Gift,
+  HistoricalMonth,
+  Income,
+  PromoCode,
+  Savings,
+  UpdateConstant,
+  UpdateIncome,
+  UpdateSavings,
+  User,
+  UserPromoCode
 } from '../types';
 
 import {
-    calculateCategoryBreakdown,
-    calculateMonthlyAvailable,
-    calculateMonthlyConstant,
-    calculateMonthlyIncome,
-    calculateMonthTotal,
-    calculateNextPayday,
-    calculateTotalMonthlyConstants,
-    calculateTotalMonthlyIncome,
-    calculateWeeklyBudget,
-    formatMonthKey,
-    getToday,
+  calculateCategoryBreakdown,
+  calculateMonthlyAvailable,
+  calculateMonthlyConstant,
+  calculateMonthlyIncome,
+  calculateMonthTotal,
+  calculateNextPayday,
+  calculateTotalMonthlyConstants,
+  calculateTotalMonthlyIncome,
+  calculateWeeklyBudget,
+  formatMonthKey,
+  getToday,
 } from '../engine/calculations';
 
 // ─── HELPERS ─────────────────────────────────────────────────
@@ -598,4 +604,208 @@ export async function loadBudgetData(userId: string) {
   ]);
 
   return { user, incomes, constants, expenses, savings, currentMonth };
+}
+
+// ============================================================
+// ADDITIONS TO firestore.ts
+// Add these imports at the top of firestore.ts alongside existing imports:
+//
+// import { Borrowed, CreateBorrowed, Gift, CreateGift, PromoCode, UserPromoCode } from '../types';
+//
+// Then paste everything below at the END of firestore.ts, before the closing.
+// ============================================================
+
+// ─── BORROWED MONEY OPERATIONS ──────────────────────────────
+
+/**
+ * Add borrowed money. Creates a debt record and an expense-like entry.
+ */
+export async function addBorrowed(userId: string, data: CreateBorrowed): Promise<string> {
+  const ref = await addDoc(collection(db, 'users', userId, 'borrowed'), {
+    ...data,
+    createdAt: now(),
+    updatedAt: now(),
+  });
+  return ref.id;
+}
+
+/**
+ * Get all borrowed records for a user (active debts).
+ */
+export async function getBorrowed(userId: string): Promise<Borrowed[]> {
+  const snap = await getDocs(collection(db, 'users', userId, 'borrowed'));
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Borrowed);
+}
+
+/**
+ * Get only active/partial borrowed records (unpaid debts).
+ */
+export async function getActiveBorrowed(userId: string): Promise<Borrowed[]> {
+  const all = await getBorrowed(userId);
+  return all.filter((b) => b.status === 'active' || b.status === 'partial');
+}
+
+/**
+ * Pay back borrowed money (partial or full).
+ * Updates the borrowed record and returns the new status.
+ */
+export async function payBackBorrowed(
+  userId: string,
+  borrowedId: string,
+  paybackAmount: number
+): Promise<Borrowed> {
+  const ref = doc(db, 'users', userId, 'borrowed', borrowedId);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) throw new Error('Borrowed record not found');
+
+  const current = { id: snap.id, ...snap.data() } as Borrowed;
+  const newPaidBack = Math.round((current.paidBack + paybackAmount) * 100) / 100;
+  const remaining = Math.round((current.amount - newPaidBack) * 100) / 100;
+
+  let newStatus: 'active' | 'partial' | 'paid';
+  if (remaining <= 0) {
+    newStatus = 'paid';
+  } else if (newPaidBack > 0) {
+    newStatus = 'partial';
+  } else {
+    newStatus = 'active';
+  }
+
+  await updateDoc(ref, {
+    paidBack: newPaidBack,
+    status: newStatus,
+    updatedAt: now(),
+  });
+
+  return { ...current, paidBack: newPaidBack, status: newStatus };
+}
+
+/**
+ * Delete a borrowed record entirely.
+ */
+export async function deleteBorrowed(userId: string, borrowedId: string): Promise<void> {
+  await deleteDoc(doc(db, 'users', userId, 'borrowed', borrowedId));
+}
+
+// ─── GIFT MONEY OPERATIONS ──────────────────────────────────
+
+/**
+ * Add gifted money for the current week.
+ */
+export async function addGift(userId: string, data: CreateGift): Promise<string> {
+  const ref = await addDoc(collection(db, 'users', userId, 'gifts'), {
+    ...data,
+    createdAt: now(),
+  });
+  return ref.id;
+}
+
+/**
+ * Get all gifts for the current month.
+ */
+export async function getGiftsByMonth(userId: string, month: string): Promise<Gift[]> {
+  const q = query(
+    collection(db, 'users', userId, 'gifts'),
+    where('month', '==', month),
+    orderBy('createdAt', 'desc')
+  );
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Gift);
+}
+
+/**
+ * Delete a gift record.
+ */
+export async function deleteGift(userId: string, giftId: string): Promise<void> {
+  await deleteDoc(doc(db, 'users', userId, 'gifts', giftId));
+}
+
+// ─── PROMO CODE OPERATIONS ──────────────────────────────────
+
+/**
+ * Validate and redeem a promo code.
+ * Returns the promo code details if valid, null if invalid.
+ */
+export async function redeemPromoCode(
+  userId: string,
+  codeString: string
+): Promise<UserPromoCode | null> {
+  // Find the promo code
+  const q = query(
+    collection(db, 'promoCodes'),
+    where('code', '==', codeString.toUpperCase().trim()),
+    where('active', '==', true),
+    limit(1)
+  );
+  const snap = await getDocs(q);
+
+  if (snap.empty) return null;
+
+  const promoDoc = snap.docs[0];
+  const promo = { id: promoDoc.id, ...promoDoc.data() } as PromoCode;
+
+  // Check if max uses reached
+  if (promo.currentUses >= promo.maxUses) return null;
+
+  // Check if user already redeemed this code
+  const userPromoQ = query(
+    collection(db, 'users', userId, 'promoCodes'),
+    where('promoCodeId', '==', promo.id),
+    limit(1)
+  );
+  const userPromoSnap = await getDocs(userPromoQ);
+  if (!userPromoSnap.empty) return null; // Already redeemed
+
+  // Calculate expiration
+  let expiresAt: string | null = null;
+  if (promo.type === 'trial' && promo.durationDays) {
+    const expDate = new Date();
+    expDate.setDate(expDate.getDate() + promo.durationDays);
+    expiresAt = expDate.toISOString();
+  }
+
+  // Create user promo code record
+  const userPromo: Omit<UserPromoCode, 'id'> = {
+    userId,
+    promoCodeId: promo.id,
+    code: promo.code,
+    type: promo.type,
+    durationDays: promo.durationDays,
+    redeemedAt: now(),
+    expiresAt,
+  };
+
+  const userPromoRef = await addDoc(
+    collection(db, 'users', userId, 'promoCodes'),
+    userPromo
+  );
+
+  // Increment usage count
+  await updateDoc(doc(db, 'promoCodes', promo.id), {
+    currentUses: promo.currentUses + 1,
+  });
+
+  return { id: userPromoRef.id, ...userPromo };
+}
+
+/**
+ * Check if user has an active promo code (forever or non-expired trial).
+ */
+export async function checkUserPromoCode(userId: string): Promise<UserPromoCode | null> {
+  const snap = await getDocs(collection(db, 'users', userId, 'promoCodes'));
+  if (snap.empty) return null;
+
+  const promoCodes = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as UserPromoCode);
+
+  // Check for forever code first
+  const foreverCode = promoCodes.find((p) => p.type === 'forever');
+  if (foreverCode) return foreverCode;
+
+  // Check for active trial code (not expired)
+  const nowTime = new Date().getTime();
+  const activeTrialCode = promoCodes.find(
+    (p) => p.type === 'trial' && p.expiresAt && new Date(p.expiresAt).getTime() > nowTime
+  );
+
+  return activeTrialCode || null;
 }

@@ -5,8 +5,7 @@ import { useAuth } from '@/src/context/AuthContext';
 import { BudgetContext, Transaction } from '@/src/context/BudgetContext';
 import { useLanguage } from '@/src/context/LanguageContext';
 import { useTheme } from '@/src/context/ThemeContext';
-import { Recommendation } from '@/src/engine/calculations';
-import { EXPENSE_CATEGORY_EMOJI, ExpenseCategory } from '@/src/types';
+import { EXPENSE_CATEGORY_EMOJI, ExpenseCategory, TransactionType } from '@/src/types';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -30,17 +29,15 @@ const CATEGORIES: Record<string, string> = {
 	Utilities: '💡', Shopping: '🛍️', Other: '📌',
 };
 
-// Locale map for date formatting
-const LOCALE_MAP = { en: 'en-US', es: 'es-ES', fr: 'fr-FR' };
+const LOCALE_MAP: Record<string, string> = { en: 'en-US', es: 'es-ES', fr: 'fr-FR' };
 
-// Helper to translate recommendation messages using templates
-function translateRecommendation(rec: Recommendation, t: any): string {
+function translateRecommendation(rec: any, t: any): string {
+	if (typeof rec === 'string') return rec;
 	const template = t[rec.messageKey as keyof typeof t];
 	if (!template || typeof template !== 'string') return rec.fallbackMessage;
-
 	let result = template;
 	for (const [key, value] of Object.entries(rec.messageParams)) {
-		result = result.replace(`{{${key}}}`, value);
+		result = result.replace(`{{${key}}}`, String(value));
 	}
 	return result;
 }
@@ -55,7 +52,6 @@ export default function DashboardScreen() {
 
 	const locale = LOCALE_MAP[language] || 'en-US';
 
-	// Tutorial steps
 	const tutorialSteps: TutorialStep[] = [
 		{ id: 'welcome', title: t.tutorialWelcome.split('!')[0] + '!', message: t.tutorialWelcome, icon: '👋', position: 'center' },
 		{ id: 'budget-card', title: t.weeklyBudget, message: t.tutorialBudgetCard, icon: '💰', position: 'top' },
@@ -79,30 +75,30 @@ export default function DashboardScreen() {
 	const budgetLeft = bs?.currentWeekRemaining ?? (weeklyBudget - totalSpent);
 	const percentSpent = weeklyBudget > 0 ? (totalSpent / weeklyBudget) * 100 : 0;
 
-	// Greeting
 	const hour = new Date().getHours();
 	const timeGreeting = hour < 12 ? t.goodMorning : hour < 17 ? t.goodAfternoon : t.goodEvening;
 	const userName = user?.name || '';
 	const greeting = userName ? `${timeGreeting}, ${userName}` : timeGreeting;
 
-	// Translate recommendations
 	const rawRecs = bs?.recommendations || [];
-	const recommendations: string[] = rawRecs.map((rec: any) => {
-		if (typeof rec === 'string') return rec;
-		return translateRecommendation(rec, t);
-	});
+	const recommendations: string[] = rawRecs.map((rec: any) => translateRecommendation(rec, t));
 
 	const daysUntilPayday = bs?.daysUntilPayday || null;
 	const savingsCurrent = bs?.savingsCurrent || 0;
 	const savingsTarget = bs?.savingsTarget || 0;
 	const savingsOnTrack = bs?.savingsOnTrack ?? true;
+	const totalBorrowed = bs?.totalBorrowed || 0;
 
+	// Build display transactions — includes expenses, gifts, borrowed, paybacks
 	const displayTransactions = bs
 		? budgetContext.expenses.map((e) => ({
 				amount: e.amount, description: e.description,
 				category: e.category, date: e.date, id: e.id,
+				transactionType: (e.transactionType || 'expense') as TransactionType,
 			}))
-		: budgetContext.transactions.map((tx: Transaction, i: number) => ({ ...tx, id: String(i) }));
+		: budgetContext.transactions.map((tx: Transaction, i: number) => ({
+				...tx, id: String(i), transactionType: 'expense' as TransactionType,
+			}));
 
 	const getProgressGradient = (): readonly [string, string] => {
 		if (percentSpent < 50) return [colors.gradientStart, colors.success];
@@ -110,10 +106,54 @@ export default function DashboardScreen() {
 		return ['#f97316', colors.danger];
 	};
 
-	const handleDeleteExpense = (expenseId: string, description: string) => {
-		const doDelete = () => {
+	const getTransactionColor = (type: TransactionType): string => {
+		switch (type) {
+			case 'gift': return colors.success;
+			case 'borrow': return colors.warning;
+			case 'payback': return colors.accent;
+			default: return colors.danger;
+		}
+	};
+
+	const getTransactionPrefix = (type: TransactionType): string => {
+		switch (type) {
+			case 'gift': return '+';
+			case 'borrow': return '+';
+			case 'payback': return '-';
+			default: return '-';
+		}
+	};
+
+	const getTransactionEmoji = (type: TransactionType, category: string): string => {
+		switch (type) {
+			case 'gift': return '🎁';
+			case 'borrow': return '🤝';
+			case 'payback': return '💳';
+			default: return CATEGORIES[category] || EXPENSE_CATEGORY_EMOJI[category as ExpenseCategory] || '📌';
+		}
+	};
+
+	const handleDeleteExpense = (expenseId: string, description: string, transactionType: TransactionType) => {
+		const doDelete = async () => {
 			if (bs) {
-				budgetContext.deleteExpenseFromFirestore(expenseId);
+				await budgetContext.deleteExpenseFromFirestore(expenseId);
+				// If it's a borrowed entry, also delete the borrowed record
+				if (transactionType === 'borrow') {
+					// Find matching borrowed record by description and delete it
+					const matchingBorrowed = budgetContext.borrowed.find(
+						(b) => b.from === description && (b.status === 'active' || b.status === 'partial')
+					);
+					if (matchingBorrowed) {
+						await budgetContext.deleteBorrowed(matchingBorrowed.id);
+					}
+				}
+				// If it's a gift, also delete the gift record
+				if (transactionType === 'gift') {
+					const matchingGift = budgetContext.gifts.find((g) => g.description === description);
+					if (matchingGift) {
+						await budgetContext.deleteGift(matchingGift.id);
+					}
+				}
 			} else {
 				const idx = parseInt(expenseId);
 				if (!isNaN(idx)) budgetContext.deleteTransaction(idx);
@@ -181,7 +221,6 @@ export default function DashboardScreen() {
 							)}
 							<Text style={[styles.heroSubtitle, { color: colors.secondaryText }]}>{t.leftThisWeek}</Text>
 
-							{/* Carry-over indicator */}
 							{bs && bs.currentWeekCarryOver !== 0 && (
 								<View style={[styles.carryOverBadge, { backgroundColor: bs.currentWeekCarryOver > 0 ? colors.successMuted : colors.dangerMuted }]}>
 									<Ionicons
@@ -195,7 +234,6 @@ export default function DashboardScreen() {
 								</View>
 							)}
 
-							{/* Week dates — translated */}
 							{bs && bs.currentWeek && (
 								<Text style={[styles.weekDates, { color: colors.tertiaryText }]}>
 									{bs.currentWeek.startDate.toLocaleDateString(locale, { month: 'short', day: 'numeric' })} - {bs.currentWeek.endDate.toLocaleDateString(locale, { month: 'short', day: 'numeric' })} · {bs.currentWeek.daysLeft} {bs.currentWeek.daysLeft !== 1 ? t.daysLeft || t.days : t.day}
@@ -223,13 +261,19 @@ export default function DashboardScreen() {
 						</View>
 					</View>
 
-					{/* Stats Row */}
+					{/* Stats Row — with Debt card when active */}
 					{bs && (
 						<View style={styles.statsRow}>
 							{[
 								{ label: t.income, value: `$${bs.totalMonthlyIncome.toFixed(0)}`, icon: 'arrow-down-outline', color: colors.accent },
 								{ label: t.bills, value: `$${bs.totalMonthlyConstants.toFixed(0)}`, icon: 'arrow-up-outline', color: colors.warning },
 								{ label: t.free, value: `$${bs.monthlyAvailable.toFixed(0)}`, icon: 'wallet-outline', color: colors.success },
+								...(totalBorrowed > 0 ? [{
+									label: t.debt || 'Debt',
+									value: `$${totalBorrowed.toFixed(0)}`,
+									icon: 'warning-outline' as const,
+									color: colors.danger,
+								}] : []),
 							].map((stat, idx: number) => (
 								<View key={idx} style={[styles.statCard, { backgroundColor: colors.glassBg, borderColor: colors.glassBorder }]}>
 									<View style={[styles.statIconCircle, { backgroundColor: `${stat.color}15` }]}>
@@ -265,7 +309,7 @@ export default function DashboardScreen() {
 						</View>
 					)}
 
-					{/* Insights — translated */}
+					{/* Insights */}
 					{recommendations.length > 0 && (
 						<View style={styles.insightsSection}>
 							{recommendations.map((rec: string, index: number) => (
@@ -283,10 +327,10 @@ export default function DashboardScreen() {
 						</View>
 					)}
 
-					{/* Add Expense CTA */}
+					{/* Add Transaction CTA */}
 					<TouchableOpacity
 						style={styles.addButton}
-						onPress={() => router.push('/(tabs)/add-expense')}
+						onPress={() => router.push('/(tabs)/add-transactions' as any)}
 						activeOpacity={0.85}
 					>
 						<LinearGradient
@@ -296,11 +340,11 @@ export default function DashboardScreen() {
 							style={styles.addButtonGradient}
 						>
 							<Ionicons name="add" size={20} color={colors.buttonText} />
-							<Text style={[styles.addButtonText, { color: colors.buttonText }]}>{t.addExpense}</Text>
+							<Text style={[styles.addButtonText, { color: colors.buttonText }]}>{t.addTransactions || t.addExpense}</Text>
 						</LinearGradient>
 					</TouchableOpacity>
 
-					{/* Transactions — translated dates */}
+					{/* Transactions — with colored entries */}
 					<View style={styles.transactionsSection}>
 						<View style={styles.transactionsHeader}>
 							<Text style={[styles.transactionsTitle, { color: colors.primaryText }]}>{t.thisWeeksSpending}</Text>
@@ -318,27 +362,34 @@ export default function DashboardScreen() {
 								<Text style={[styles.emptySubtitle, { color: colors.tertiaryText }]}>{t.addOneToGetStarted}</Text>
 							</View>
 						) : (
-							displayTransactions.map((item: { id: string; amount: number; description: string; category: string; date: string }, index: number) => (
-								<TouchableOpacity
-									key={item.id || index}
-									style={[styles.transactionRow, index === displayTransactions.length - 1 && styles.transactionRowLast]}
-									onLongPress={() => handleDeleteExpense(item.id, item.description)}
-									activeOpacity={0.7}
-								>
-									<View style={[styles.transactionIconCircle, { backgroundColor: colors.glassBgLight }]}>
-										<Text style={styles.transactionEmoji}>
-											{CATEGORIES[item.category] || EXPENSE_CATEGORY_EMOJI[item.category as ExpenseCategory] || '📌'}
+							displayTransactions.map((item, index: number) => {
+								const txType = item.transactionType || 'expense';
+								const txColor = getTransactionColor(txType);
+								const txPrefix = getTransactionPrefix(txType);
+								const txEmoji = getTransactionEmoji(txType, item.category);
+
+								return (
+									<TouchableOpacity
+										key={item.id || index}
+										style={[styles.transactionRow, index === displayTransactions.length - 1 && styles.transactionRowLast]}
+										onLongPress={() => handleDeleteExpense(item.id, item.description, txType)}
+										activeOpacity={0.7}
+									>
+										<View style={[styles.transactionIconCircle, { backgroundColor: `${txColor}15` }]}>
+											<Text style={styles.transactionEmoji}>{txEmoji}</Text>
+										</View>
+										<View style={styles.transactionInfo}>
+											<Text style={[styles.transactionName, { color: colors.primaryText }]}>{item.description}</Text>
+											<Text style={[styles.transactionDate, { color: colors.tertiaryText }]}>
+												{new Date(item.date).toLocaleDateString(locale, { month: 'short', day: 'numeric' })}
+											</Text>
+										</View>
+										<Text style={[styles.transactionAmount, { color: txColor }]}>
+											{txPrefix}${item.amount.toFixed(2)}
 										</Text>
-									</View>
-									<View style={styles.transactionInfo}>
-										<Text style={[styles.transactionName, { color: colors.primaryText }]}>{item.description}</Text>
-										<Text style={[styles.transactionDate, { color: colors.tertiaryText }]}>
-											{new Date(item.date).toLocaleDateString(locale, { month: 'short', day: 'numeric' })}
-										</Text>
-									</View>
-									<Text style={[styles.transactionAmount, { color: colors.danger }]}>-${item.amount.toFixed(2)}</Text>
-								</TouchableOpacity>
-							))
+									</TouchableOpacity>
+								);
+							})
 						)}
 					</View>
 
@@ -383,8 +434,8 @@ const styles = StyleSheet.create({
 	progressLabel: { fontSize: 12, fontWeight: '600' },
 	progressTrack: { height: 6, borderRadius: 3, overflow: 'hidden' },
 	progressFill: { height: 6, borderRadius: 3 },
-	statsRow: { flexDirection: 'row', paddingHorizontal: 20, gap: 10, marginBottom: 16 },
-	statCard: { flex: 1, borderRadius: 16, borderWidth: 1, padding: 14, alignItems: 'center', gap: 6 },
+	statsRow: { flexDirection: 'row', paddingHorizontal: 20, gap: 10, marginBottom: 16, flexWrap: 'wrap' },
+	statCard: { flex: 1, minWidth: 70, borderRadius: 16, borderWidth: 1, padding: 14, alignItems: 'center', gap: 6 },
 	statIconCircle: { width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
 	statValue: { fontSize: 17, fontWeight: '700', letterSpacing: -0.3 },
 	statLabel: { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },

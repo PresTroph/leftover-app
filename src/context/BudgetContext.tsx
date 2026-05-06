@@ -1,56 +1,43 @@
 'use client';
 
 import React, {
-    createContext,
-    ReactNode,
-    useCallback,
-    useContext,
-    useEffect,
-    useReducer,
-    useRef,
+  createContext, ReactNode, useCallback, useContext, useEffect, useReducer, useRef,
 } from 'react';
 
 import {
-    BudgetState,
-    Constant,
-    CreateConstant,
-    CreateExpense,
-    CreateIncome,
-    CreateSavings,
-    Expense,
-    Income,
-    Savings,
-    UpdateConstant,
-    UpdateIncome,
-    UpdateSavings,
-    User
+  Borrowed, BudgetState, Constant, CreateBorrowed, CreateConstant, CreateExpense,
+  CreateGift, CreateIncome, CreateSavings, Expense, Gift, Income, Savings,
+  UpdateConstant, UpdateIncome, UpdateSavings, User
 } from '../types';
 
-import {
-    buildBudgetState,
-    formatMonthKey,
-    getToday
-} from '../engine/calculations';
+import { buildBudgetState, formatMonthKey, getToday } from '../engine/calculations';
 
 import {
-    addConstant as fsAddConstant,
-    addExpense as fsAddExpense,
-    addIncome as fsAddIncome,
-    addToSavings as fsAddToSavings,
-    deleteConstant as fsDeleteConstant,
-    deleteExpense as fsDeleteExpense,
-    deleteIncome as fsDeleteIncome,
-    deleteSavings as fsDeleteSavings,
-    executeReset as fsExecuteReset,
-    getConstants as fsGetConstants,
-    getExpensesByMonth as fsGetExpensesByMonth,
-    getIncomes as fsGetIncomes,
-    getSavings as fsGetSavings,
-    setSavings as fsSetSavings,
-    updateConstant as fsUpdateConstant,
-    updateIncome as fsUpdateIncome,
-    updateSavings as fsUpdateSavings,
-    withdrawFromSavings as fsWithdrawFromSavings,
+  addBorrowed as fsAddBorrowed,
+  addConstant as fsAddConstant,
+  addExpense as fsAddExpense,
+  addGift as fsAddGift,
+  addIncome as fsAddIncome,
+  addToSavings as fsAddToSavings,
+  deleteBorrowed as fsDeleteBorrowed,
+  deleteConstant as fsDeleteConstant,
+  deleteExpense as fsDeleteExpense,
+  deleteGift as fsDeleteGift,
+  deleteIncome as fsDeleteIncome,
+  deleteSavings as fsDeleteSavings,
+  executeReset as fsExecuteReset,
+  getBorrowed as fsGetBorrowed,
+  getConstants as fsGetConstants,
+  getExpensesByMonth as fsGetExpensesByMonth,
+  getGiftsByMonth as fsGetGiftsByMonth,
+  getIncomes as fsGetIncomes,
+  getSavings as fsGetSavings,
+  payBackBorrowed as fsPayBackBorrowed,
+  setSavings as fsSetSavings,
+  updateConstant as fsUpdateConstant,
+  updateIncome as fsUpdateIncome,
+  updateSavings as fsUpdateSavings,
+  withdrawFromSavings as fsWithdrawFromSavings
 } from '../services/firestore';
 
 // ─── LEGACY ─────────────────────────────────────────────────
@@ -98,6 +85,17 @@ export interface BudgetContextType {
   deleteSavings: () => Promise<void>;
   savings: Savings | null;
 
+  // Borrowed money
+  addBorrowed: (data: CreateBorrowed) => Promise<void>;
+  payBackBorrowed: (borrowedId: string, amount: number) => Promise<void>;
+  deleteBorrowed: (borrowedId: string) => Promise<void>;
+  borrowed: Borrowed[];
+
+  // Gifts
+  addGift: (data: CreateGift) => Promise<void>;
+  deleteGift: (giftId: string) => Promise<void>;
+  gifts: Gift[];
+
   refreshBudget: () => Promise<void>;
   executeReset: (action: 'carry-over' | 'savings' | 'weekly-boost') => Promise<void>;
   setUser: (user: User | null) => void;
@@ -114,6 +112,8 @@ interface State {
   constants: Constant[];
   expenses: Expense[];
   savings: Savings | null;
+  borrowed: Borrowed[];
+  gifts: Gift[];
   user: User | null;
   isLoading: boolean;
   error: string | null;
@@ -128,6 +128,8 @@ const initialState: State = {
   constants: [],
   expenses: [],
   savings: null,
+  borrowed: [],
+  gifts: [],
   user: null,
   isLoading: false,
   error: null,
@@ -141,11 +143,13 @@ type Action =
   | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'SET_ERROR'; payload: string | null }
   | { type: 'SET_USER'; payload: User | null }
-  | { type: 'LOAD_DATA'; payload: { incomes: Income[]; constants: Constant[]; expenses: Expense[]; savings: Savings | null } }
+  | { type: 'LOAD_DATA'; payload: { incomes: Income[]; constants: Constant[]; expenses: Expense[]; savings: Savings | null; borrowed: Borrowed[]; gifts: Gift[] } }
   | { type: 'SET_INCOMES'; payload: Income[] }
   | { type: 'SET_CONSTANTS'; payload: Constant[] }
   | { type: 'SET_EXPENSES'; payload: Expense[] }
   | { type: 'SET_SAVINGS'; payload: Savings | null }
+  | { type: 'SET_BORROWED'; payload: Borrowed[] }
+  | { type: 'SET_GIFTS'; payload: Gift[] }
   | { type: 'SET_BUDGET_STATE'; payload: BudgetState };
 
 function reducer(state: State, action: Action): State {
@@ -171,6 +175,8 @@ function reducer(state: State, action: Action): State {
         constants: action.payload.constants,
         expenses: action.payload.expenses,
         savings: action.payload.savings,
+        borrowed: action.payload.borrowed,
+        gifts: action.payload.gifts,
         isLoading: false,
         error: null,
       };
@@ -182,6 +188,10 @@ function reducer(state: State, action: Action): State {
       return { ...state, expenses: action.payload };
     case 'SET_SAVINGS':
       return { ...state, savings: action.payload };
+    case 'SET_BORROWED':
+      return { ...state, borrowed: action.payload };
+    case 'SET_GIFTS':
+      return { ...state, gifts: action.payload };
     case 'SET_BUDGET_STATE':
       return { ...state, budgetState: action.payload, weeklyBudget: action.payload.weeklyBudget };
     default:
@@ -197,32 +207,30 @@ export const BudgetContext = createContext<BudgetContextType | null>(null);
 
 export function BudgetProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialState);
-
-  // Use refs to avoid stale closures in callbacks
   const userRef = useRef<User | null>(null);
 
-  // Keep ref in sync with state
   useEffect(() => {
     userRef.current = state.user;
   }, [state.user]);
 
-  // ── Helper: get userId safely ──
   const getUserId = (): string | null => {
     return userRef.current?.id || null;
   };
 
-  // ── Core data loader ──
+  // ── Core data loader — now includes borrowed & gifts ──
   const loadAllData = useCallback(async (userId: string) => {
     console.log('[Budget] Loading all data for user:', userId);
     dispatch({ type: 'SET_LOADING', payload: true });
 
     try {
       const currentMonth = formatMonthKey(getToday());
-      const [incomes, constants, expenses, savings] = await Promise.all([
+      const [incomes, constants, expenses, savings, borrowed, gifts] = await Promise.all([
         fsGetIncomes(userId),
         fsGetConstants(userId),
         fsGetExpensesByMonth(userId, currentMonth),
         fsGetSavings(userId),
+        fsGetBorrowed(userId),
+        fsGetGiftsByMonth(userId, currentMonth),
       ]);
 
       console.log('[Budget] Loaded:', {
@@ -230,11 +238,13 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
         constants: constants.length,
         expenses: expenses.length,
         hasSavings: !!savings,
+        borrowed: borrowed.length,
+        gifts: gifts.length,
       });
 
       dispatch({
         type: 'LOAD_DATA',
-        payload: { incomes, constants, expenses, savings },
+        payload: { incomes, constants, expenses, savings, borrowed, gifts },
       });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to load data';
@@ -252,9 +262,9 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
     }
   }, [state.user?.id, loadAllData]);
 
-  // ── Recompute budget state when data changes ──
+  // ── Recompute budget state when data changes — now includes borrowed & gifts ──
   useEffect(() => {
-    if (state.user && (state.incomes.length > 0 || state.constants.length > 0 || state.expenses.length > 0 || state.savings)) {
+    if (state.user && (state.incomes.length > 0 || state.constants.length > 0 || state.expenses.length > 0 || state.savings || state.borrowed.length > 0 || state.gifts.length > 0)) {
       const budgetState = buildBudgetState(
         {
           name: state.user.name || 'User',
@@ -264,19 +274,18 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
         state.incomes,
         state.constants,
         state.expenses,
-        state.savings
+        state.savings,
+        state.borrowed,
+        state.gifts
       );
       dispatch({ type: 'SET_BUDGET_STATE', payload: budgetState });
     }
-  }, [state.user, state.incomes, state.constants, state.expenses, state.savings]);
+  }, [state.user, state.incomes, state.constants, state.expenses, state.savings, state.borrowed, state.gifts]);
 
-  // ── Refresh (public, uses ref) ──
+  // ── Refresh ──
   const refreshBudget = useCallback(async () => {
     const uid = getUserId();
-    if (!uid) {
-      console.warn('[Budget] refreshBudget called with no user');
-      return;
-    }
+    if (!uid) return;
     await loadAllData(uid);
   }, [loadAllData]);
 
@@ -328,11 +337,9 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
     const uid = getUserId();
     if (!uid) return;
     try {
-      console.log('[Budget] Deleting income:', incomeId);
       await fsDeleteIncome(uid, incomeId);
       const incomes = await fsGetIncomes(uid);
       dispatch({ type: 'SET_INCOMES', payload: incomes });
-      console.log('[Budget] Income deleted, remaining:', incomes.length);
     } catch (err: unknown) {
       console.error('[Budget] deleteIncome error:', err);
       throw err;
@@ -370,11 +377,9 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
     const uid = getUserId();
     if (!uid) return;
     try {
-      console.log('[Budget] Deleting constant:', constantId);
       await fsDeleteConstant(uid, constantId);
       const constants = await fsGetConstants(uid);
       dispatch({ type: 'SET_CONSTANTS', payload: constants });
-      console.log('[Budget] Constant deleted, remaining:', constants.length);
     } catch (err: unknown) {
       console.error('[Budget] deleteConstant error:', err);
       throw err;
@@ -400,12 +405,10 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
     const uid = getUserId();
     if (!uid) return;
     try {
-      console.log('[Budget] Deleting expense:', expenseId);
       await fsDeleteExpense(uid, expenseId);
       const currentMonth = formatMonthKey(getToday());
       const expenses = await fsGetExpensesByMonth(uid, currentMonth);
       dispatch({ type: 'SET_EXPENSES', payload: expenses });
-      console.log('[Budget] Expense deleted, remaining:', expenses.length);
     } catch (err: unknown) {
       console.error('[Budget] deleteExpense error:', err);
       throw err;
@@ -477,6 +480,75 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // ── Borrowed Money ──
+  const addBorrowedMoney = useCallback(async (data: CreateBorrowed) => {
+    const uid = getUserId();
+    if (!uid) return;
+    try {
+      await fsAddBorrowed(uid, data);
+      const borrowed = await fsGetBorrowed(uid);
+      dispatch({ type: 'SET_BORROWED', payload: borrowed });
+    } catch (err: unknown) {
+      console.error('[Budget] addBorrowed error:', err);
+      throw err;
+    }
+  }, []);
+
+  const payBackBorrowedMoney = useCallback(async (borrowedId: string, amount: number) => {
+    const uid = getUserId();
+    if (!uid) return;
+    try {
+      await fsPayBackBorrowed(uid, borrowedId, amount);
+      const borrowed = await fsGetBorrowed(uid);
+      dispatch({ type: 'SET_BORROWED', payload: borrowed });
+    } catch (err: unknown) {
+      console.error('[Budget] payBackBorrowed error:', err);
+      throw err;
+    }
+  }, []);
+
+  const deleteBorrowedMoney = useCallback(async (borrowedId: string) => {
+    const uid = getUserId();
+    if (!uid) return;
+    try {
+      await fsDeleteBorrowed(uid, borrowedId);
+      const borrowed = await fsGetBorrowed(uid);
+      dispatch({ type: 'SET_BORROWED', payload: borrowed });
+    } catch (err: unknown) {
+      console.error('[Budget] deleteBorrowed error:', err);
+      throw err;
+    }
+  }, []);
+
+  // ── Gifts ──
+  const addGiftMoney = useCallback(async (data: CreateGift) => {
+    const uid = getUserId();
+    if (!uid) return;
+    try {
+      await fsAddGift(uid, data);
+      const currentMonth = formatMonthKey(getToday());
+      const gifts = await fsGetGiftsByMonth(uid, currentMonth);
+      dispatch({ type: 'SET_GIFTS', payload: gifts });
+    } catch (err: unknown) {
+      console.error('[Budget] addGift error:', err);
+      throw err;
+    }
+  }, []);
+
+  const deleteGiftMoney = useCallback(async (giftId: string) => {
+    const uid = getUserId();
+    if (!uid) return;
+    try {
+      await fsDeleteGift(uid, giftId);
+      const currentMonth = formatMonthKey(getToday());
+      const gifts = await fsGetGiftsByMonth(uid, currentMonth);
+      dispatch({ type: 'SET_GIFTS', payload: gifts });
+    } catch (err: unknown) {
+      console.error('[Budget] deleteGift error:', err);
+      throw err;
+    }
+  }, []);
+
   // ── Reset ──
   const executeResetAction = useCallback(async (action: 'carry-over' | 'savings' | 'weekly-boost') => {
     const uid = getUserId();
@@ -524,6 +596,15 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
     addToSavings: addToSavingsAmount,
     withdrawFromSavings: withdrawFromSavingsAmount,
     deleteSavings: deleteSavingsGoal,
+
+    borrowed: state.borrowed,
+    addBorrowed: addBorrowedMoney,
+    payBackBorrowed: payBackBorrowedMoney,
+    deleteBorrowed: deleteBorrowedMoney,
+
+    gifts: state.gifts,
+    addGift: addGiftMoney,
+    deleteGift: deleteGiftMoney,
 
     refreshBudget,
     executeReset: executeResetAction,

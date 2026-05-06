@@ -3,6 +3,7 @@
 import { useAuth } from '@/src/context/AuthContext';
 import { useLanguage } from '@/src/context/LanguageContext';
 import { useTheme } from '@/src/context/ThemeContext';
+import { redeemPromoCode } from '@/src/services/firestore';
 import {
 	initRevenueCat,
 	purchaseWeeklySubscription,
@@ -48,6 +49,10 @@ export default function OnboardingScreen() {
 	const [isPurchasing, setIsPurchasing] = useState(false);
 	const [authError, setAuthError] = useState('');
 	const hasRedirected = useRef(false);
+	const [showPromoInput, setShowPromoInput] = useState(false);
+	const [promoCode, setPromoCode] = useState('');
+	const [promoError, setPromoError] = useState('');
+	const [promoLoading, setPromoLoading] = useState(false);
 
 	// Dev login state
 	const [showDevLogin, setShowDevLogin] = useState(false);
@@ -164,6 +169,52 @@ export default function OnboardingScreen() {
 			setIsPurchasing(false);
 		}
 	};
+
+	const handlePromoCode = async () => {
+    if (!promoCode.trim()) {
+        setPromoError('Enter a promo code');
+        return;
+    }
+    setPromoLoading(true);
+    setPromoError('');
+    try {
+        const { getRevenueCatUserId, initRevenueCat } = await import('@/src/services/revenuecat');
+        await initRevenueCat();
+        let userId = await getRevenueCatUserId();
+        if (!userId) {
+            setPromoError('Unable to create account. Try again.');
+            setPromoLoading(false);
+            return;
+        }
+        const { signInAnonymously } = await import('firebase/auth');
+        const { auth } = await import('@/src/config/firebase');
+        await signInAnonymously(auth);
+        const result = await redeemPromoCode(userId, promoCode.trim());
+        if (!result) {
+            setPromoError('Invalid or expired code');
+            setPromoLoading(false);
+            return;
+        }
+        if (result.type === 'forever') {
+            await loginWithRevenueCat(userId);
+            router.replace('/(tabs)/dashboard');
+        } else {
+            const { purchaseWeeklySubscription } = await import('@/src/services/revenuecat');
+            const subUserId = await purchaseWeeklySubscription();
+            if (subUserId) {
+                await loginWithRevenueCat(subUserId);
+            } else {
+                await loginWithRevenueCat(userId);
+            }
+            router.replace('/(tabs)/dashboard');
+        }
+    } catch (err) {
+        console.error('[Promo] Error:', err);
+        setPromoError('Something went wrong. Try again.');
+    } finally {
+        setPromoLoading(false);
+    }
+};
 
 	// Dev auth (web only)
 	const handleDevAuth = async () => {
@@ -340,7 +391,7 @@ export default function OnboardingScreen() {
 								<Text style={[styles.errorTextSmall, { color: colors.danger }]}>{authError}</Text>
 							) : null}
 
-							<Text style={[styles.noPayment, { color: '#FFFFFF' }]}>
+							<Text style={[styles.noPayment, { color: colors.primaryText }]}>
 								{t.noPaymentDueNow}
 							</Text>
 
@@ -371,22 +422,56 @@ export default function OnboardingScreen() {
 								</LinearGradient>
 							</TouchableOpacity>
 
-							<Text style={[styles.pricingText, { color: '#FFFFFF' }]}>
+							<Text style={[styles.pricingText, { color: colors.primaryText }]}>
 								{t.threeDaysFree}, then $2.99/week
 							</Text>
 
 							<View style={styles.legalRow}>
 								<TouchableOpacity onPress={handleRestore}>
-									<Text style={[styles.legalText, { color: '#FFFFFF' }]}>{t.restorePurchase}</Text>
+									<Text style={[styles.legalText, {color: colors.primaryText }]}>{t.restorePurchase}</Text>
 								</TouchableOpacity>
 								<TouchableOpacity>
-									<Text style={[styles.legalText, { color: '#FFFFFF' }]}>{t.termsOfUse}</Text>
+									<Text style={[styles.legalText, { color: colors.primaryText }]}>{t.termsOfUse}</Text>
 								</TouchableOpacity>
 								<TouchableOpacity>
-									<Text style={[styles.legalText, { color: '#FFFFFF' }]}>{t.privacyPolicy}</Text>
+									<Text style={[styles.legalText, { color: colors.primaryText }]}>{t.privacyPolicy}</Text>
 								</TouchableOpacity>
 							</View>
-						</>
+							{!showPromoInput ? (
+    <TouchableOpacity onPress={() => setShowPromoInput(true)} style={{ marginTop: 12 }}>
+        <Text style={{ fontSize: 13, fontWeight: '600', textDecorationLine: 'underline', color: colors.primaryText }}>Have a code?</Text>
+    </TouchableOpacity>
+) : (
+    <View style={{ marginTop: 12, alignItems: 'center', gap: 8, width: '100%' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 12, overflow: 'hidden', width: '100%', backgroundColor: colors.inputBg, borderColor: colors.inputBorder }}>
+            <TextInput
+                style={{ flex: 1, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, fontWeight: '600', color: colors.primaryText }}
+                placeholder="Enter promo code"
+                placeholderTextColor={colors.tertiaryText}
+                autoCapitalize="characters"
+                autoCorrect={false}
+                value={promoCode}
+                onChangeText={setPromoCode}
+            />
+            <TouchableOpacity
+                style={{ paddingHorizontal: 16, paddingVertical: 12, backgroundColor: colors.accent }}
+                onPress={handlePromoCode}
+                disabled={promoLoading}
+            >
+                {promoLoading ? (
+                    <ActivityIndicator color={colors.buttonText} size="small" />
+                ) : (
+                    <Text style={{ fontSize: 14, fontWeight: '700', color: colors.buttonText }}>Redeem</Text>
+                )}
+            </TouchableOpacity>
+        </View>
+        {promoError ? <Text style={{ fontSize: 12, fontWeight: '500', color: colors.danger }}>{promoError}</Text> : null}
+        <TouchableOpacity onPress={() => { setShowPromoInput(false); setPromoError(''); }}>
+            <Text style={{ fontSize: 13, fontWeight: '500', color: colors.secondaryText }}>Cancel</Text>
+        </TouchableOpacity>
+    </View>
+)}
+					</>
 					)}
 				</View>
 			</SafeAreaView>

@@ -88,6 +88,9 @@ export const EXPENSE_CATEGORY_EMOJI: Record<ExpenseCategory, string> = {
   Utilities: '💡', Shopping: '🛍️', Other: '📌',
 };
 
+// Transaction type — used for expenses, gifts, borrowed, payback
+export type TransactionType = 'expense' | 'gift' | 'borrow' | 'payback';
+
 export interface Expense {
   id: string;
   userId: string;
@@ -97,8 +100,73 @@ export interface Expense {
   date: string;
   weekNumber: number;
   month: string;
+  transactionType?: TransactionType; // defaults to 'expense' for backward compat
+  borrowedId?: string; // links payback to specific borrowed record
   createdAt: string;
 }
+
+// ─── BORROWED MONEY ─────────────────────────────────────────
+
+export type BorrowedStatus = 'active' | 'partial' | 'paid';
+
+export interface Borrowed {
+  id: string;
+  userId: string;
+  amount: number;
+  paidBack: number;
+  from: string; // "Borrowed from Arthur"
+  status: BorrowedStatus;
+  weekNumber: number;
+  month: string;
+  date: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type CreateBorrowed = Omit<Borrowed, 'id' | 'createdAt' | 'updatedAt'>;
+
+// ─── GIFTED MONEY ───────────────────────────────────────────
+
+export interface Gift {
+  id: string;
+  userId: string;
+  amount: number;
+  description: string; // "Gift from Mom"
+  weekNumber: number;
+  month: string;
+  date: string;
+  createdAt: string;
+}
+
+export type CreateGift = Omit<Gift, 'id' | 'createdAt'>;
+
+// ─── PROMO CODES ────────────────────────────────────────────
+
+export type PromoCodeType = 'trial' | 'forever';
+
+export interface PromoCode {
+  id: string;
+  code: string;
+  type: PromoCodeType;
+  durationDays: number | null; // null for forever
+  maxUses: number;
+  currentUses: number;
+  active: boolean;
+  createdAt: string;
+}
+
+export interface UserPromoCode {
+  id: string;
+  userId: string;
+  promoCodeId: string;
+  code: string;
+  type: PromoCodeType;
+  durationDays: number | null;
+  redeemedAt: string;
+  expiresAt: string | null; // null for forever
+}
+
+// ─── EXISTING TYPES (unchanged) ─────────────────────────────
 
 export type SavingsTargetType = 'fixed' | 'percentage';
 
@@ -190,6 +258,11 @@ export interface BudgetState {
   currentMonth: string;
   resetDay: number;
   daysUntilReset: number;
+  // New: borrowed & gifts
+  totalBorrowed: number;
+  totalGiftsThisWeek: number;
+  borrowedRecords: Borrowed[];
+  giftsThisWeek: Gift[];
 }
 
 export interface FirestoreTimestamp { seconds: number; nanoseconds: number; }

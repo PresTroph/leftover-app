@@ -162,7 +162,7 @@ export interface Translations {
   phone: string;
   internet: string;
   childcare: string;
-  debt: string;
+  
 
   // Savings
   currentSavings: string;
@@ -229,6 +229,17 @@ export interface Translations {
   recTopCategory: string;
   recDailySuggestion: string;
   recGreatPace: string;
+
+  // Transactions
+  addTransactions: string;
+  addGift: string;
+  addBorrowed: string;
+  payBack: string;
+  paybackAmount: string;
+  selectDebt: string;
+  giftFrom: string;
+  borrowedFrom: string;
+  debt: string;
 }
 
 const translations: Record<Language, Translations> = {
@@ -348,7 +359,7 @@ const translations: Record<Language, Translations> = {
     phone: 'Phone',
     internet: 'Internet',
     childcare: 'Childcare',
-    debt: 'Debt',
+    
 
     currentSavings: 'Current Savings',
     ofGoal: 'of',
@@ -410,6 +421,15 @@ const translations: Record<Language, Translations> = {
     recTopCategory: '{{category}} is {{percent}}% of your spending. Look for ways to cut back.',
     recDailySuggestion: 'You can spend ~${{amount}}/day for the rest of this week.',
     recGreatPace: 'Great pace! You have ${{amount}} left this week.',
+    addTransactions: 'Add Transaction',
+    addGift: 'Add Gift',
+    addBorrowed: 'Borrow',
+    payBack: 'Pay Back',
+    paybackAmount: 'Payback Amount',
+    selectDebt: 'Select Debt to Pay Back',
+    giftFrom: 'Gift from',
+    borrowedFrom: 'Borrowed from',
+    debt: 'Debt',
   },
   es: {
     dashboard: 'Panel',
@@ -527,7 +547,7 @@ const translations: Record<Language, Translations> = {
     phone: 'Teléfono',
     internet: 'Internet',
     childcare: 'Cuidado Infantil',
-    debt: 'Deuda',
+    
 
     currentSavings: 'Ahorros Actuales',
     ofGoal: 'de',
@@ -589,6 +609,15 @@ const translations: Record<Language, Translations> = {
     recTopCategory: '{{category}} es el {{percent}}% de tus gastos. Busca formas de reducir.',
     recDailySuggestion: 'Puedes gastar ~${{amount}}/día el resto de esta semana.',
     recGreatPace: '¡Buen ritmo! Te quedan ${{amount}} esta semana.',
+    addTransactions: 'Agregar Transacción',
+    addGift: 'Agregar Regalo',
+    addBorrowed: 'Pedir Prestado',
+    payBack: 'Pagar',
+    paybackAmount: 'Monto del Pago',
+    selectDebt: 'Seleccionar Deuda',
+    giftFrom: 'Regalo de',
+    borrowedFrom: 'Prestado de',
+    debt: 'Deuda',
   },
   fr: {
     dashboard: 'Tableau de Bord',
@@ -768,6 +797,15 @@ const translations: Record<Language, Translations> = {
     recTopCategory: '{{category}} représente {{percent}}% de vos dépenses. Cherchez des moyens de réduire.',
     recDailySuggestion: 'Vous pouvez dépenser ~${{amount}}/jour le reste de cette semaine.',
     recGreatPace: 'Bon rythme ! Il vous reste ${{amount}} cette semaine.',
+    addTransactions: 'Ajouter Transaction',
+    addGift: 'Ajouter Cadeau',
+    addBorrowed: 'Emprunter',
+    payBack: 'Rembourser',
+    paybackAmount: 'Montant du Remboursement',
+    selectDebt: 'Sélectionner la Dette',
+    giftFrom: 'Cadeau de',
+    borrowedFrom: 'Emprunté de',
+    
   },
 };
 

@@ -1,16 +1,16 @@
 'use client';
-
+ 
 import { useLanguage } from '@/src/context/LanguageContext';
 import { useTheme } from '@/src/context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import React from 'react';
 import { View } from 'react-native';
-
+ 
 export default function TabsLayout() {
   const { colors } = useTheme();
   const { t } = useLanguage();
-
+ 
   return (
     <Tabs
       screenOptions={{
@@ -42,9 +42,9 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="add-expense"
+        name="add-transactions"
         options={{
-          title: t.addExpense,
+          title: t.addTransactions || 'Add',
           tabBarIcon: ({ color, focused }: { color: string; focused: boolean }) => (
             <View style={{
               width: 36,
@@ -73,6 +73,14 @@ export default function TabsLayout() {
           ),
         }}
       />
+      {/* Hide old add-expense if file still exists */}
+      <Tabs.Screen
+        name="add-expense"
+        options={{
+          href: null,
+        }}
+      />
     </Tabs>
   );
 }
+ 
