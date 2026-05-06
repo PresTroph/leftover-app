@@ -186,7 +186,7 @@ export interface BudgetState {
   currentMonthTotal: number;
   categoryBreakdown: CategoryBreakdown;
   greeting: string;
-  recommendations: string[];
+  recommendations: any[];
   currentMonth: string;
   resetDay: number;
   daysUntilReset: number;

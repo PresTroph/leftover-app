@@ -5,20 +5,21 @@ import { useAuth } from '@/src/context/AuthContext';
 import { BudgetContext, Transaction } from '@/src/context/BudgetContext';
 import { useLanguage } from '@/src/context/LanguageContext';
 import { useTheme } from '@/src/context/ThemeContext';
+import { Recommendation } from '@/src/engine/calculations';
 import { EXPENSE_CATEGORY_EMOJI, ExpenseCategory } from '@/src/types';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useContext } from 'react';
 import {
-    Alert,
-    Dimensions,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+	Alert,
+	Dimensions,
+	Platform,
+	ScrollView,
+	StyleSheet,
+	Text,
+	TouchableOpacity,
+	View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -29,56 +30,43 @@ const CATEGORIES: Record<string, string> = {
 	Utilities: '💡', Shopping: '🛍️', Other: '📌',
 };
 
+// Locale map for date formatting
+const LOCALE_MAP = { en: 'en-US', es: 'es-ES', fr: 'fr-FR' };
+
+// Helper to translate recommendation messages using templates
+function translateRecommendation(rec: Recommendation, t: any): string {
+	const template = t[rec.messageKey as keyof typeof t];
+	if (!template || typeof template !== 'string') return rec.fallbackMessage;
+
+	let result = template;
+	for (const [key, value] of Object.entries(rec.messageParams)) {
+		result = result.replace(`{{${key}}}`, value);
+	}
+	return result;
+}
+
 export default function DashboardScreen() {
 	const budgetContext = useContext(BudgetContext);
 	const { user } = useAuth();
 	const { colors, isDarkMode } = useTheme();
-	const { t } = useLanguage();
+	const { t, language } = useLanguage();
 	const router = useRouter();
 	const { showTutorial, completeTutorial } = useTutorial();
 
+	const locale = LOCALE_MAP[language] || 'en-US';
+
 	// Tutorial steps
 	const tutorialSteps: TutorialStep[] = [
-		{
-			id: 'welcome',
-			title: t.tutorialWelcome.split('!')[0] + '!',
-			message: t.tutorialWelcome,
-			icon: '👋',
-			position: 'center',
-		},
-		{
-			id: 'budget-card',
-			title: t.weeklyBudget,
-			message: t.tutorialBudgetCard,
-			icon: '💰',
-			position: 'top',
-		},
-		{
-			id: 'stats',
-			title: t.budgetSummary,
-			message: t.tutorialStats,
-			icon: '📊',
-			position: 'center',
-		},
-		{
-			id: 'add-expense',
-			title: t.addExpense,
-			message: t.tutorialAddExpense,
-			icon: '⚡',
-			position: 'center',
-		},
-		{
-			id: 'financial-setup',
-			title: t.financialSetup,
-			message: t.tutorialFinancialSetup,
-			icon: '⚙️',
-			position: 'bottom',
-		},
+		{ id: 'welcome', title: t.tutorialWelcome.split('!')[0] + '!', message: t.tutorialWelcome, icon: '👋', position: 'center' },
+		{ id: 'budget-card', title: t.weeklyBudget, message: t.tutorialBudgetCard, icon: '💰', position: 'top' },
+		{ id: 'stats', title: t.budgetSummary, message: t.tutorialStats, icon: '📊', position: 'center' },
+		{ id: 'add-expense', title: t.addExpense, message: t.tutorialAddExpense, icon: '⚡', position: 'center' },
+		{ id: 'financial-setup', title: t.financialSetup, message: t.tutorialFinancialSetup, icon: '⚙️', position: 'bottom' },
 	];
 
 	if (!budgetContext) {
 		return (
-			<SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}> 
+			<SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
 				<Text style={[styles.errorText, { color: colors.danger }]}>{t.loading}</Text>
 			</SafeAreaView>
 		);
@@ -91,13 +79,19 @@ export default function DashboardScreen() {
 	const budgetLeft = bs?.currentWeekRemaining ?? (weeklyBudget - totalSpent);
 	const percentSpent = weeklyBudget > 0 ? (totalSpent / weeklyBudget) * 100 : 0;
 
-	// Build greeting with user name
+	// Greeting
 	const hour = new Date().getHours();
 	const timeGreeting = hour < 12 ? t.goodMorning : hour < 17 ? t.goodAfternoon : t.goodEvening;
 	const userName = user?.name || '';
 	const greeting = userName ? `${timeGreeting}, ${userName}` : timeGreeting;
 
-	const recommendations = bs?.recommendations || [];
+	// Translate recommendations
+	const rawRecs = bs?.recommendations || [];
+	const recommendations: string[] = rawRecs.map((rec: any) => {
+		if (typeof rec === 'string') return rec;
+		return translateRecommendation(rec, t);
+	});
+
 	const daysUntilPayday = bs?.daysUntilPayday || null;
 	const savingsCurrent = bs?.savingsCurrent || 0;
 	const savingsTarget = bs?.savingsTarget || 0;
@@ -139,7 +133,7 @@ export default function DashboardScreen() {
 	};
 
 	return (
-		<View style={[styles.container, { backgroundColor: colors.background }]}> 
+		<View style={[styles.container, { backgroundColor: colors.background }]}>
 			<SafeAreaView style={{ flex: 1 }}>
 				<ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
 					{/* Header */}
@@ -149,7 +143,7 @@ export default function DashboardScreen() {
 							{daysUntilPayday !== null && daysUntilPayday > 0 && (
 								<View style={styles.paydayBadge}>
 									<View style={[styles.paydayDot, { backgroundColor: colors.accent }]} />
-									<Text style={[styles.paydayText, { color: colors.secondaryText }]}> 
+									<Text style={[styles.paydayText, { color: colors.secondaryText }]}>
 										{t.paydayIn} {daysUntilPayday} {daysUntilPayday !== 1 ? t.days : t.day}
 									</Text>
 								</View>
@@ -165,7 +159,7 @@ export default function DashboardScreen() {
 					</View>
 
 					{/* Hero Budget Card */}
-					<View style={[styles.heroCard, { backgroundColor: colors.glassBg, borderColor: colors.glassBorder }]}> 
+					<View style={[styles.heroCard, { backgroundColor: colors.glassBg, borderColor: colors.glassBorder }]}>
 						<LinearGradient
 							colors={[`${colors.gradientStart}12`, `${colors.gradientEnd}08`, 'transparent']}
 							start={{ x: 0, y: 0 }}
@@ -181,7 +175,7 @@ export default function DashboardScreen() {
 								</Text>
 							</View>
 							{budgetLeft < 0 && (
-								<Text style={[styles.overBudgetBadge, { color: colors.danger, backgroundColor: colors.dangerMuted }]}> 
+								<Text style={[styles.overBudgetBadge, { color: colors.danger, backgroundColor: colors.dangerMuted }]}>
 									{t.overBudget}
 								</Text>
 							)}
@@ -189,31 +183,31 @@ export default function DashboardScreen() {
 
 							{/* Carry-over indicator */}
 							{bs && bs.currentWeekCarryOver !== 0 && (
-								<View style={[styles.carryOverBadge, { backgroundColor: bs.currentWeekCarryOver > 0 ? colors.successMuted : colors.dangerMuted }]}> 
+								<View style={[styles.carryOverBadge, { backgroundColor: bs.currentWeekCarryOver > 0 ? colors.successMuted : colors.dangerMuted }]}>
 									<Ionicons
 										name={bs.currentWeekCarryOver > 0 ? 'arrow-up' : 'arrow-down'}
 										size={12}
 										color={bs.currentWeekCarryOver > 0 ? colors.success : colors.danger}
 									/>
-									<Text style={[styles.carryOverText, { color: bs.currentWeekCarryOver > 0 ? colors.success : colors.danger }]}> 
-										{bs.currentWeekCarryOver > 0 ? '+' : ''}${bs.currentWeekCarryOver.toFixed(2)} from last week
+									<Text style={[styles.carryOverText, { color: bs.currentWeekCarryOver > 0 ? colors.success : colors.danger }]}>
+										{bs.currentWeekCarryOver > 0 ? '+' : ''}${bs.currentWeekCarryOver.toFixed(2)} {t.fromLastWeek}
 									</Text>
 								</View>
 							)}
 
-							{/* Week dates */}
+							{/* Week dates — translated */}
 							{bs && bs.currentWeek && (
 								<Text style={[styles.weekDates, { color: colors.tertiaryText }]}>
-									{bs.currentWeek.startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {bs.currentWeek.endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} · {bs.currentWeek.daysLeft} day{bs.currentWeek.daysLeft !== 1 ? 's' : ''} left
+									{bs.currentWeek.startDate.toLocaleDateString(locale, { month: 'short', day: 'numeric' })} - {bs.currentWeek.endDate.toLocaleDateString(locale, { month: 'short', day: 'numeric' })} · {bs.currentWeek.daysLeft} {bs.currentWeek.daysLeft !== 1 ? t.daysLeft || t.days : t.day}
 								</Text>
 							)}
 
 							<View style={styles.progressSection}>
 								<View style={styles.progressLabels}>
-									<Text style={[styles.progressLabel, { color: colors.tertiaryText }]}> 
+									<Text style={[styles.progressLabel, { color: colors.tertiaryText }]}>
 										${totalSpent.toFixed(0)} {t.spent}
 									</Text>
-									<Text style={[styles.progressLabel, { color: colors.tertiaryText }]}> 
+									<Text style={[styles.progressLabel, { color: colors.tertiaryText }]}>
 										${(bs?.currentWeekAdjustedBudget || weeklyBudget).toFixed(0)}{bs ? ` · Wk ${bs.currentWeekNumber}` : ''}
 									</Text>
 								</View>
@@ -237,7 +231,7 @@ export default function DashboardScreen() {
 								{ label: t.bills, value: `$${bs.totalMonthlyConstants.toFixed(0)}`, icon: 'arrow-up-outline', color: colors.warning },
 								{ label: t.free, value: `$${bs.monthlyAvailable.toFixed(0)}`, icon: 'wallet-outline', color: colors.success },
 							].map((stat, idx: number) => (
-								<View key={idx} style={[styles.statCard, { backgroundColor: colors.glassBg, borderColor: colors.glassBorder }]}> 
+								<View key={idx} style={[styles.statCard, { backgroundColor: colors.glassBg, borderColor: colors.glassBorder }]}>
 									<View style={[styles.statIconCircle, { backgroundColor: `${stat.color}15` }]}>
 										<Ionicons name={stat.icon as any} size={16} color={stat.color} />
 									</View>
@@ -250,13 +244,13 @@ export default function DashboardScreen() {
 
 					{/* Savings */}
 					{savingsTarget > 0 && (
-						<View style={[styles.savingsCard, { backgroundColor: colors.glassBg, borderColor: colors.glassBorder }]}> 
+						<View style={[styles.savingsCard, { backgroundColor: colors.glassBg, borderColor: colors.glassBorder }]}>
 							<View style={styles.savingsHeader}>
 								<View style={styles.savingsLeft}>
 									<Ionicons name="trending-up" size={18} color={colors.success} />
 									<Text style={[styles.savingsTitle, { color: colors.primaryText }]}>{t.savingsGoal}</Text>
 								</View>
-								<Text style={[styles.savingsAmount, { color: savingsOnTrack ? colors.success : colors.warning }]}> 
+								<Text style={[styles.savingsAmount, { color: savingsOnTrack ? colors.success : colors.warning }]}>
 									${savingsCurrent.toFixed(0)}/${savingsTarget.toFixed(0)}
 								</Text>
 							</View>
@@ -271,11 +265,11 @@ export default function DashboardScreen() {
 						</View>
 					)}
 
-					{/* Insights */}
+					{/* Insights — translated */}
 					{recommendations.length > 0 && (
 						<View style={styles.insightsSection}>
 							{recommendations.map((rec: string, index: number) => (
-								<View key={index} style={[styles.insightCard, { backgroundColor: colors.glassBg, borderColor: colors.glassBorder }]}> 
+								<View key={index} style={[styles.insightCard, { backgroundColor: colors.glassBg, borderColor: colors.glassBorder }]}>
 									<LinearGradient
 										colors={[`${colors.gradientStart}08`, `${colors.gradientEnd}04`]}
 										start={{ x: 0, y: 0.5 }}
@@ -306,12 +300,12 @@ export default function DashboardScreen() {
 						</LinearGradient>
 					</TouchableOpacity>
 
-					{/* Transactions */}
+					{/* Transactions — translated dates */}
 					<View style={styles.transactionsSection}>
 						<View style={styles.transactionsHeader}>
 							<Text style={[styles.transactionsTitle, { color: colors.primaryText }]}>{t.thisWeeksSpending}</Text>
 							{displayTransactions.length > 0 && (
-								<Text style={[styles.transactionsCount, { color: colors.tertiaryText }]}> 
+								<Text style={[styles.transactionsCount, { color: colors.tertiaryText }]}>
 									{displayTransactions.length} {displayTransactions.length !== 1 ? t.items : t.item}
 								</Text>
 							)}
@@ -339,7 +333,7 @@ export default function DashboardScreen() {
 									<View style={styles.transactionInfo}>
 										<Text style={[styles.transactionName, { color: colors.primaryText }]}>{item.description}</Text>
 										<Text style={[styles.transactionDate, { color: colors.tertiaryText }]}>
-											{new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+											{new Date(item.date).toLocaleDateString(locale, { month: 'short', day: 'numeric' })}
 										</Text>
 									</View>
 									<Text style={[styles.transactionAmount, { color: colors.danger }]}>-${item.amount.toFixed(2)}</Text>
@@ -352,7 +346,6 @@ export default function DashboardScreen() {
 				</ScrollView>
 			</SafeAreaView>
 
-			{/* Tutorial Overlay */}
 			{showTutorial && (
 				<TutorialOverlay
 					steps={tutorialSteps}

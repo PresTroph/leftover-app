@@ -1,12 +1,17 @@
 // ============================================================
 // LEFTOVER - Calculation Engine (Enhanced)
-// Carry-over logic, week tracking, AI recommendations
+// Automatic carry-over, translated recommendations
 // ============================================================
 
 import {
-  Income, IncomeFrequency, Constant, ConstantFrequency,
-  Expense, Savings, DayOfWeek, CategoryBreakdown,
-  WeeklyBreakdown, BudgetState, WeekInfo,
+  BudgetState,
+  CategoryBreakdown,
+  Constant, ConstantFrequency,
+  DayOfWeek,
+  Expense,
+  Income, IncomeFrequency,
+  Savings,
+  WeekInfo
 } from '../types';
 
 // ─── DATE HELPERS ────────────────────────────────────────────
@@ -66,9 +71,6 @@ export function getNextMonthlyDate(dayOfMonth: number, from?: Date): Date {
 
 // ─── WEEK DATE CALCULATIONS ─────────────────────────────────
 
-/**
- * Get the start date of a specific week relative to reset day.
- */
 export function getWeekStartDate(resetDay: number, weekNumber: number, date?: Date): Date {
   const today = date || getToday();
   const year = today.getFullYear();
@@ -91,9 +93,6 @@ export function getWeekStartDate(resetDay: number, weekNumber: number, date?: Da
   return weekStart;
 }
 
-/**
- * Get the end date of a specific week (6 days after start).
- */
 export function getWeekEndDate(resetDay: number, weekNumber: number, date?: Date): Date {
   const start = getWeekStartDate(resetDay, weekNumber, date);
   const end = new Date(start);
@@ -101,9 +100,6 @@ export function getWeekEndDate(resetDay: number, weekNumber: number, date?: Date
   return end;
 }
 
-/**
- * Get days remaining in the current week.
- */
 export function getDaysLeftInWeek(resetDay: number, date?: Date): number {
   const today = date || getToday();
   const weekNumber = getCurrentWeekNumber(resetDay, today);
@@ -252,37 +248,30 @@ export function calculateMonthTotal(expenses: Expense[]): number {
   return Math.round(expenses.reduce((sum, e) => sum + e.amount, 0) * 100) / 100;
 }
 
-// ─── CARRY-OVER CALCULATION ─────────────────────────────────
+// ─── AUTOMATIC CARRY-OVER ───────────────────────────────────
 
 /**
- * Calculate carry-over for the current week based on previous weeks' spending.
- * - Overspend: auto-deducted from next week (negative carry-over)
- * - Underspend: user chose what to do (carry-over, savings, or reset)
- *   If not yet chosen, defaults to carry-over for calculation purposes.
- * 
- * The stored weekCarryOver on the user doc is the source of truth.
- * This function calculates what the carry-over SHOULD be for display.
+ * Calculate automatic carry-over for the current week.
+ * - Walks through all previous weeks
+ * - Each week: budget + carryIn - spent = carryOut
+ * - carryOut becomes next week's carryIn
+ * - Fully automatic: positive carries over, negative carries over
  */
-export function calculateWeekCarryOver(
+export function calculateAutoCarryOver(
   weeklyBudget: number,
   expenses: Expense[],
-  currentWeekNumber: number,
-  storedCarryOver: number
+  currentWeekNumber: number
 ): number {
-  if (currentWeekNumber <= 1) return storedCarryOver || 0;
+  if (currentWeekNumber <= 1) return 0;
 
-  // Check what happened last week
-  const lastWeekSpent = calculateWeekSpending(expenses, currentWeekNumber - 1);
-  const lastWeekDiff = weeklyBudget - lastWeekSpent;
-
-  if (lastWeekDiff < 0) {
-    // Overspent last week — auto-deduct (always)
-    return Math.round(lastWeekDiff * 100) / 100;
+  let carryOver = 0;
+  for (let w = 1; w < currentWeekNumber; w++) {
+    const weekBudget = weeklyBudget + carryOver;
+    const weekSpent = calculateWeekSpending(expenses, w);
+    carryOver = Math.round((weekBudget - weekSpent) * 100) / 100;
   }
 
-  // Underspent — use the stored carry-over from user's choice
-  // If they haven't made a choice yet, the stored value is what we use
-  return storedCarryOver || 0;
+  return carryOver;
 }
 
 /**
@@ -318,7 +307,7 @@ export function buildWeekInfo(
 }
 
 /**
- * Build previous weeks for history view.
+ * Build previous weeks for history view with automatic carry-over chain.
  */
 export function buildPreviousWeeks(
   currentWeekNumber: number,
@@ -327,16 +316,13 @@ export function buildPreviousWeeks(
   expenses: Expense[]
 ): WeekInfo[] {
   const weeks: WeekInfo[] = [];
+  let carryOver = 0;
 
   for (let w = 1; w < currentWeekNumber; w++) {
-    const spent = calculateWeekSpending(expenses, w);
-    const diff = weeklyBudget - spent;
-    // For historical weeks, carry-over is the deficit/surplus from the week before
-    const prevWeekCarry = w > 1 ? (weeks[w - 2]?.remaining || 0) : 0;
-    // Only carry over deficits automatically; surpluses depend on user choice
-    const carryOver = w > 1 && prevWeekCarry < 0 ? prevWeekCarry : 0;
-
-    weeks.push(buildWeekInfo(w, resetDay, weeklyBudget, carryOver, expenses));
+    const week = buildWeekInfo(w, resetDay, weeklyBudget, carryOver, expenses);
+    weeks.push(week);
+    // Automatic: remaining from this week carries to next
+    carryOver = week.remaining;
   }
 
   return weeks;
@@ -373,11 +359,13 @@ export function getTimeBasedGreeting(name: string, language: 'en' | 'es' | 'fr' 
   return name ? `${base}, ${name}` : base;
 }
 
-// ─── AI RECOMMENDATIONS ─────────────────────────────────────
+// ─── AI RECOMMENDATIONS (TRANSLATED) ────────────────────────
 
 export interface Recommendation {
   type: 'warning' | 'tip' | 'goal';
-  message: string;
+  messageKey: string;
+  messageParams: Record<string, string>;
+  fallbackMessage: string;
   priority: number;
 }
 
@@ -393,13 +381,17 @@ export function generateRecommendations(
   if (carryOver < 0) {
     recommendations.push({
       type: 'warning',
-      message: `Last week's overspend reduced this week's budget by $${Math.abs(carryOver).toFixed(2)}.`,
+      messageKey: 'recOverspendReducedBudget',
+      messageParams: { amount: Math.abs(carryOver).toFixed(2) },
+      fallbackMessage: `Last week's overspend reduced this week's budget by $${Math.abs(carryOver).toFixed(2)}.`,
       priority: 1,
     });
   } else if (carryOver > 0) {
     recommendations.push({
       type: 'tip',
-      message: `$${carryOver.toFixed(2)} carried over from last week. Nice!`,
+      messageKey: 'recCarryOverNice',
+      messageParams: { amount: carryOver.toFixed(2) },
+      fallbackMessage: `$${carryOver.toFixed(2)} carried over from last week. Nice!`,
       priority: 5,
     });
   }
@@ -409,7 +401,9 @@ export function generateRecommendations(
     const over = Math.round((currentWeekSpent - adjustedBudget) * 100) / 100;
     recommendations.push({
       type: 'warning',
-      message: `You're $${over} over budget this week. This will reduce next week's budget.`,
+      messageKey: 'recOverBudgetWarning',
+      messageParams: { amount: over.toFixed(2) },
+      fallbackMessage: `You're $${over} over budget this week. This will reduce next week's budget.`,
       priority: 1,
     });
   }
@@ -420,7 +414,9 @@ export function generateRecommendations(
     const overBy = Math.round((projectedMonthly - monthlyAvailable) * 100) / 100;
     recommendations.push({
       type: 'warning',
-      message: `At this pace, you'll overspend by ~$${overBy} this month.`,
+      messageKey: 'recMonthlyPaceWarning',
+      messageParams: { amount: overBy.toFixed(2) },
+      fallbackMessage: `At this pace, you'll overspend by ~$${overBy} this month.`,
       priority: 2,
     });
   }
@@ -431,7 +427,9 @@ export function generateRecommendations(
     const perDay = Math.round((remaining / Math.max(daysUntilReset, 1)) * 100) / 100;
     recommendations.push({
       type: 'goal',
-      message: `Save $${perDay}/day to hit your $${savingsTarget} savings goal.`,
+      messageKey: 'recSavingsGoalDaily',
+      messageParams: { amount: perDay.toFixed(2), target: savingsTarget.toFixed(0) },
+      fallbackMessage: `Save $${perDay}/day to hit your $${savingsTarget} savings goal.`,
       priority: 3,
     });
   }
@@ -444,7 +442,9 @@ export function generateRecommendations(
     if (topPercent > 40) {
       recommendations.push({
         type: 'tip',
-        message: `${topCat} is ${topPercent}% of your spending. Look for ways to cut back.`,
+        messageKey: 'recTopCategory',
+        messageParams: { category: topCat, percent: String(topPercent) },
+        fallbackMessage: `${topCat} is ${topPercent}% of your spending. Look for ways to cut back.`,
         priority: 4,
       });
     }
@@ -455,7 +455,9 @@ export function generateRecommendations(
     const dailyBudget = Math.round(((adjustedBudget - currentWeekSpent) / daysLeftInWeek) * 100) / 100;
     recommendations.push({
       type: 'tip',
-      message: `You can spend ~$${dailyBudget}/day for the rest of this week.`,
+      messageKey: 'recDailySuggestion',
+      messageParams: { amount: dailyBudget.toFixed(2) },
+      fallbackMessage: `You can spend ~$${dailyBudget}/day for the rest of this week.`,
       priority: 6,
     });
   }
@@ -465,7 +467,9 @@ export function generateRecommendations(
     const saved = Math.round((adjustedBudget - currentWeekSpent) * 100) / 100;
     recommendations.push({
       type: 'tip',
-      message: `Great pace! You have $${saved} left this week.`,
+      messageKey: 'recGreatPace',
+      messageParams: { amount: saved.toFixed(2) },
+      fallbackMessage: `Great pace! You have $${saved} left this week.`,
       priority: 7,
     });
   }
@@ -476,7 +480,7 @@ export function generateRecommendations(
 // ─── FULL BUDGET STATE BUILDER ──────────────────────────────
 
 export function buildBudgetState(
-  user: { name: string; language: 'en' | 'es' | 'fr'; resetDay: number; weekCarryOver?: number },
+  user: { name: string; language: 'en' | 'es' | 'fr'; resetDay: number },
   incomes: Income[],
   constants: Constant[],
   expenses: Expense[],
@@ -492,7 +496,6 @@ export function buildBudgetState(
 
   const monthlyAvailableBeforeSavings = calculateMonthlyAvailable(totalMonthlyIncome, totalMonthlyConstants);
 
-  // Savings deduction — savings target reduces your spendable budget
   const savingsTarget = savings ? calculateSavingsTarget(savings, totalMonthlyIncome) : 0;
   const savingsCurrent = savings?.currentAmount || 0;
   const monthlyAvailable = Math.round((monthlyAvailableBeforeSavings - savingsTarget) * 100) / 100;
@@ -500,32 +503,26 @@ export function buildBudgetState(
   const weeklyBudget = calculateWeeklyBudget(Math.max(monthlyAvailable, 0));
   const currentWeekNumber = getCurrentWeekNumber(user.resetDay);
 
-  // Carry-over logic
-  const storedCarryOver = user.weekCarryOver || 0;
-  const carryOver = calculateWeekCarryOver(weeklyBudget, expenses, currentWeekNumber, storedCarryOver);
+  // AUTOMATIC carry-over: walks through all previous weeks
+  const carryOver = calculateAutoCarryOver(weeklyBudget, expenses, currentWeekNumber);
   const adjustedBudget = Math.round((weeklyBudget + carryOver) * 100) / 100;
 
   const currentWeekSpent = calculateWeekSpending(expenses, currentWeekNumber);
   const currentWeekRemaining = Math.round((adjustedBudget - currentWeekSpent) * 100) / 100;
 
-  // Week info
   const daysLeftInWeek = getDaysLeftInWeek(user.resetDay);
   const currentWeek = buildWeekInfo(currentWeekNumber, user.resetDay, weeklyBudget, carryOver, expenses);
   const previousWeeks = buildPreviousWeeks(currentWeekNumber, user.resetDay, weeklyBudget, expenses);
 
-  // Expenses
   const currentMonthTotal = calculateMonthTotal(expenses);
   const categoryBreakdown = calculateCategoryBreakdown(expenses);
 
-  // Savings on-track check
   const savingsOnTrack = savings
     ? isSavingsOnTrack(savingsCurrent, savingsTarget, today.getDate(), getDaysInMonth(today.getFullYear(), today.getMonth()))
     : true;
 
-  // Reset
   const daysUntilReset = getDaysUntilReset(user.resetDay);
 
-  // AI
   const greeting = getTimeBasedGreeting(user.name, user.language);
   const recs = generateRecommendations(
     weeklyBudget, currentWeekSpent, currentWeekNumber,
@@ -556,7 +553,7 @@ export function buildBudgetState(
     currentMonthTotal,
     categoryBreakdown,
     greeting,
-    recommendations: recs.map((r) => r.message),
+    recommendations: recs,
     currentMonth,
     resetDay: user.resetDay,
     daysUntilReset,

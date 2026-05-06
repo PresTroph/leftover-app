@@ -1,6 +1,41 @@
-import React, { createContext, ReactNode, useContext, useState } from 'react';
+import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
+import { Platform } from 'react-native';
 
 export type Language = 'en' | 'es' | 'fr';
+
+const LANGUAGE_STORAGE_KEY = 'leftover_language';
+
+// ─── PERSISTENCE HELPERS ────────────────────────────────────
+
+async function saveLanguage(lang: Language): Promise<void> {
+  try {
+    if (Platform.OS === 'web') {
+      window.localStorage.setItem(LANGUAGE_STORAGE_KEY, lang);
+    } else {
+      const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
+      await AsyncStorage.setItem(LANGUAGE_STORAGE_KEY, lang);
+    }
+  } catch { /* silently fail */ }
+}
+
+async function getSavedLanguage(): Promise<Language | null> {
+  try {
+    if (Platform.OS === 'web') {
+      const val = window.localStorage.getItem(LANGUAGE_STORAGE_KEY);
+      if (val === 'en' || val === 'es' || val === 'fr') return val;
+      return null;
+    } else {
+      const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
+      const val = await AsyncStorage.getItem(LANGUAGE_STORAGE_KEY);
+      if (val === 'en' || val === 'es' || val === 'fr') return val;
+      return null;
+    }
+  } catch {
+    return null;
+  }
+}
+
+// ─── TRANSLATIONS ───────────────────────────────────────────
 
 export interface Translations {
   // Common
@@ -62,6 +97,8 @@ export interface Translations {
   monthlyConstants: string;
   availableBudget: string;
   weeklyBudget: string;
+  fromLastWeek: string;
+  daysLeft: string;
 
   // Add Expense
   expenseAmount: string;
@@ -157,6 +194,7 @@ export interface Translations {
   logout: string;
   logoutConfirm: string;
   appearance: string;
+  account: string;
 
   // Paywall
   leftoverPremium: string;
@@ -181,6 +219,16 @@ export interface Translations {
   tutorialNext: string;
   tutorialDone: string;
   tutorialGotIt: string;
+
+  // AI Recommendations (translated templates)
+  recOverspendReducedBudget: string;
+  recCarryOverNice: string;
+  recOverBudgetWarning: string;
+  recMonthlyPaceWarning: string;
+  recSavingsGoalDaily: string;
+  recTopCategory: string;
+  recDailySuggestion: string;
+  recGreatPace: string;
 }
 
 const translations: Record<Language, Translations> = {
@@ -241,6 +289,8 @@ const translations: Record<Language, Translations> = {
     monthlyConstants: 'Monthly Constants',
     availableBudget: 'Available Budget',
     weeklyBudget: 'Weekly Budget',
+    fromLastWeek: 'from last week',
+    daysLeft: 'days left',
 
     expenseAmount: 'Expense Amount',
     description: 'Description',
@@ -328,6 +378,7 @@ const translations: Record<Language, Translations> = {
     logout: 'Logout',
     logoutConfirm: 'Are you sure you want to sign out?',
     appearance: 'Appearance',
+    account: 'Account',
 
     leftoverPremium: 'Leftover Premium',
     unlockUnlimitedFeatures: 'Unlock unlimited features',
@@ -350,6 +401,15 @@ const translations: Record<Language, Translations> = {
     tutorialNext: 'Next',
     tutorialDone: 'Got it!',
     tutorialGotIt: 'Let\'s go!',
+
+    recOverspendReducedBudget: 'Last week\'s overspend reduced this week\'s budget by ${{amount}}.',
+    recCarryOverNice: '${{amount}} carried over from last week. Nice!',
+    recOverBudgetWarning: 'You\'re ${{amount}} over budget this week. This will reduce next week\'s budget.',
+    recMonthlyPaceWarning: 'At this pace, you\'ll overspend by ~${{amount}} this month.',
+    recSavingsGoalDaily: 'Save ${{amount}}/day to hit your ${{target}} savings goal.',
+    recTopCategory: '{{category}} is {{percent}}% of your spending. Look for ways to cut back.',
+    recDailySuggestion: 'You can spend ~${{amount}}/day for the rest of this week.',
+    recGreatPace: 'Great pace! You have ${{amount}} left this week.',
   },
   es: {
     dashboard: 'Panel',
@@ -408,6 +468,8 @@ const translations: Record<Language, Translations> = {
     monthlyConstants: 'Gastos Fijos Mensuales',
     availableBudget: 'Presupuesto Disponible',
     weeklyBudget: 'Presupuesto Semanal',
+    fromLastWeek: 'de la semana pasada',
+    daysLeft: 'días restantes',
 
     expenseAmount: 'Monto del Gasto',
     description: 'Descripción',
@@ -495,6 +557,7 @@ const translations: Record<Language, Translations> = {
     logout: 'Cerrar Sesión',
     logoutConfirm: '¿Estás seguro de que quieres cerrar sesión?',
     appearance: 'Apariencia',
+    account: 'Cuenta',
 
     leftoverPremium: 'Leftover Premium',
     unlockUnlimitedFeatures: 'Desbloquea funciones ilimitadas',
@@ -517,6 +580,15 @@ const translations: Record<Language, Translations> = {
     tutorialNext: 'Siguiente',
     tutorialDone: '¡Entendido!',
     tutorialGotIt: '¡Vamos!',
+
+    recOverspendReducedBudget: 'El exceso de la semana pasada redujo el presupuesto de esta semana en ${{amount}}.',
+    recCarryOverNice: '${{amount}} transferido de la semana pasada. ¡Bien!',
+    recOverBudgetWarning: 'Estás ${{amount}} por encima del presupuesto esta semana. Esto reducirá el presupuesto de la próxima semana.',
+    recMonthlyPaceWarning: 'A este ritmo, gastarás de más ~${{amount}} este mes.',
+    recSavingsGoalDaily: 'Ahorra ${{amount}}/día para alcanzar tu meta de ${{target}}.',
+    recTopCategory: '{{category}} es el {{percent}}% de tus gastos. Busca formas de reducir.',
+    recDailySuggestion: 'Puedes gastar ~${{amount}}/día el resto de esta semana.',
+    recGreatPace: '¡Buen ritmo! Te quedan ${{amount}} esta semana.',
   },
   fr: {
     dashboard: 'Tableau de Bord',
@@ -575,6 +647,8 @@ const translations: Record<Language, Translations> = {
     monthlyConstants: 'Charges Mensuelles',
     availableBudget: 'Budget Disponible',
     weeklyBudget: 'Budget Hebdomadaire',
+    fromLastWeek: 'de la semaine dernière',
+    daysLeft: 'jours restants',
 
     expenseAmount: 'Montant de la Dépense',
     description: 'Description',
@@ -662,6 +736,7 @@ const translations: Record<Language, Translations> = {
     logout: 'Déconnexion',
     logoutConfirm: 'Êtes-vous sûr de vouloir vous déconnecter ?',
     appearance: 'Apparence',
+    account: 'Compte',
 
     leftoverPremium: 'Leftover Premium',
     unlockUnlimitedFeatures: 'Débloquez des fonctionnalités illimitées',
@@ -684,6 +759,15 @@ const translations: Record<Language, Translations> = {
     tutorialNext: 'Suivant',
     tutorialDone: 'Compris !',
     tutorialGotIt: 'Allons-y !',
+
+    recOverspendReducedBudget: 'Le dépassement de la semaine dernière a réduit le budget de cette semaine de ${{amount}}.',
+    recCarryOverNice: '${{amount}} reporté de la semaine dernière. Bien !',
+    recOverBudgetWarning: 'Vous avez dépassé de ${{amount}} cette semaine. Cela réduira le budget de la semaine prochaine.',
+    recMonthlyPaceWarning: 'À ce rythme, vous dépenserez ~${{amount}} de trop ce mois.',
+    recSavingsGoalDaily: 'Épargnez ${{amount}}/jour pour atteindre votre objectif de ${{target}}.',
+    recTopCategory: '{{category}} représente {{percent}}% de vos dépenses. Cherchez des moyens de réduire.',
+    recDailySuggestion: 'Vous pouvez dépenser ~${{amount}}/jour le reste de cette semaine.',
+    recGreatPace: 'Bon rythme ! Il vous reste ${{amount}} cette semaine.',
   },
 };
 
@@ -696,7 +780,20 @@ interface LanguageContextType {
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
 export const LanguageProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [language, setLanguage] = useState<Language>('en');
+  const [language, setLanguageState] = useState<Language>('en');
+
+  // Load saved language on mount
+  useEffect(() => {
+    getSavedLanguage().then((saved) => {
+      if (saved) setLanguageState(saved);
+    });
+  }, []);
+
+  // Save language when it changes
+  const setLanguage = (lang: Language) => {
+    setLanguageState(lang);
+    saveLanguage(lang);
+  };
 
   const t = translations[language];
 
