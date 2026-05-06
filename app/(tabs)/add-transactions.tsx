@@ -39,10 +39,10 @@ export default function AddTransactionsScreen() {
 	const { colors } = useTheme();
 	const { t } = useLanguage();
 	const {
-		addExpenseToFirestore, budgetState,
-		addBorrowed, borrowed, payBackBorrowed,
-		addGift,
-	} = useBudget();
+    addExpenseToFirestore, budgetState,
+    addBorrowed, borrowed, payBackBorrowed,
+    addGift, refreshBudget,
+} = useBudget();
 
 	const [mode, setMode] = useState<TransactionMode>('expense');
 	const [amount, setAmount] = useState('');
@@ -95,38 +95,37 @@ export default function AddTransactionsScreen() {
 						category: selectedCategory, date: now, weekNumber, month: currentMonth,
 						transactionType: 'expense',
 					});
+					await refreshBudget();
 					break;
 
 				case 'gift':
-					// Add as gift record
 					await addGift({
 						userId: '', amount: parsedAmount,
 						description: description.trim() || 'Gift received',
 						weekNumber, month: currentMonth, date: now,
 					});
-					// Also add as expense entry with negative effect (shows in spending list as green)
 					await addExpenseToFirestore({
 						userId: '', amount: parsedAmount,
 						description: description.trim() || 'Gift received',
 						category: 'Other', date: now, weekNumber, month: currentMonth,
 						transactionType: 'gift',
 					});
+					await refreshBudget();
 					break;
 
 				case 'borrow':
-					// Add borrowed record (debt tracking)
 					await addBorrowed({
 						userId: '', amount: parsedAmount, paidBack: 0,
 						from: description.trim() || 'Borrowed',
 						status: 'active', weekNumber, month: currentMonth, date: now,
 					});
-					// Also add as expense entry (shows in spending list)
 					await addExpenseToFirestore({
 						userId: '', amount: parsedAmount,
 						description: description.trim() || 'Borrowed',
 						category: 'Other', date: now, weekNumber, month: currentMonth,
 						transactionType: 'borrow',
 					});
+					await refreshBudget();
 					break;
 
 				case 'payback':
@@ -134,9 +133,7 @@ export default function AddTransactionsScreen() {
 					const remaining = selectedDebt.amount - selectedDebt.paidBack;
 					const payAmount = Math.min(parsedAmount, remaining);
 
-					// Pay back the borrowed record
 					await payBackBorrowed(selectedDebt.id, payAmount);
-					// Add as expense (deducts from weekly)
 					await addExpenseToFirestore({
 						userId: '', amount: payAmount,
 						description: `Payback to ${selectedDebt.from}`,
@@ -144,6 +141,7 @@ export default function AddTransactionsScreen() {
 						transactionType: 'payback',
 						borrowedId: selectedDebt.id,
 					});
+					await refreshBudget();
 					break;
 			}
 
