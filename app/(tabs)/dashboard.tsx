@@ -8,8 +8,8 @@ import { useTheme } from '@/src/context/ThemeContext';
 import { EXPENSE_CATEGORY_EMOJI, ExpenseCategory, TransactionType } from '@/src/types';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
-import React, { useContext } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import React, { useCallback, useContext } from 'react';
 import {
 	Alert,
 	Dimensions,
@@ -49,6 +49,14 @@ export default function DashboardScreen() {
 	const { t, language } = useLanguage();
 	const router = useRouter();
 	const { showTutorial, completeTutorial } = useTutorial();
+
+	useFocusEffect(
+    useCallback(() => {
+        if (budgetContext?.refreshBudget) {
+            budgetContext.refreshBudget();
+        }
+    }, [])
+);
 
 	const locale = LOCALE_MAP[language] || 'en-US';
 
