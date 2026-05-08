@@ -178,36 +178,20 @@ export default function OnboardingScreen() {
     setPromoLoading(true);
     setPromoError('');
     try {
-        const { getRevenueCatUserId, initRevenueCat } = await import('@/src/services/revenuecat');
-        await initRevenueCat();
-        let userId = await getRevenueCatUserId();
-        if (!userId) {
-            setPromoError('Unable to create account. Try again.');
-            setPromoLoading(false);
-            return;
-        }
         const { signInAnonymously } = await import('firebase/auth');
         const { auth } = await import('@/src/config/firebase');
-        await signInAnonymously(auth);
+        const cred = await signInAnonymously(auth);
+        const userId = cred.user.uid;
+
         const result = await redeemPromoCode(userId, promoCode.trim());
         if (!result) {
             setPromoError('Invalid or expired code');
             setPromoLoading(false);
             return;
         }
-        if (result.type === 'forever') {
-            await loginWithRevenueCat(userId);
-            router.replace('/(tabs)/dashboard');
-        } else {
-            const { purchaseWeeklySubscription } = await import('@/src/services/revenuecat');
-            const subUserId = await purchaseWeeklySubscription();
-            if (subUserId) {
-                await loginWithRevenueCat(subUserId);
-            } else {
-                await loginWithRevenueCat(userId);
-            }
-            router.replace('/(tabs)/dashboard');
-        }
+
+        await loginWithRevenueCat(userId);
+        router.replace('/(tabs)/dashboard');
     } catch (err) {
         console.error('[Promo] Error:', err);
         setPromoError('Something went wrong. Try again.');
