@@ -3,7 +3,6 @@
 import { useAuth } from '@/src/context/AuthContext';
 import { useLanguage } from '@/src/context/LanguageContext';
 import { useTheme } from '@/src/context/ThemeContext';
-import { redeemPromoCode } from '@/src/services/firestore';
 import {
 	initRevenueCat,
 	purchaseWeeklySubscription,
@@ -183,8 +182,20 @@ export default function OnboardingScreen() {
         const cred = await signInAnonymously(auth);
         const userId = cred.user.uid;
 
-        const result = await redeemPromoCode(userId, promoCode.trim());
-        if (!result) {
+        const { collection, getDocs } = await import('firebase/firestore');
+        const { db } = await import('@/src/config/firebase');
+        
+        const snap = await getDocs(collection(db, 'promoCodes'));
+        let foundPromo = null;
+        
+        snap.forEach((doc) => {
+            const data = doc.data();
+            if (data.code === promoCode.trim().toUpperCase() && data.active === true && data.currentUses < data.maxUses) {
+                foundPromo = { id: doc.id, ...data };
+            }
+        });
+
+        if (!foundPromo) {
             setPromoError('Invalid or expired code');
             setPromoLoading(false);
             return;
