@@ -192,9 +192,9 @@ export default function OnboardingScreen() {
 
         await loginWithRevenueCat(userId);
         router.replace('/(tabs)/dashboard');
-    } catch (err) {
+    } catch (err: any) {
         console.error('[Promo] Error:', err);
-        setPromoError('Something went wrong. Try again.');
+        setPromoError(err?.message || err?.code || 'Something went wrong. Try again.');
     } finally {
         setPromoLoading(false);
     }
