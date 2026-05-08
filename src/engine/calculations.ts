@@ -243,7 +243,9 @@ export function calculateCategoryBreakdown(expenses: Expense[]): CategoryBreakdo
 }
 
 export function calculateWeekSpending(expenses: Expense[], weekNumber: number): number {
-  return expenses.filter((e) => e.weekNumber === weekNumber).reduce((sum, e) => sum + e.amount, 0);
+  return expenses
+    .filter((e) => e.weekNumber === weekNumber && e.transactionType !== 'gift' && e.transactionType !== 'borrow')
+    .reduce((sum, e) => sum + e.amount, 0);
 }
 
 export function calculateMonthTotal(expenses: Expense[]): number {
