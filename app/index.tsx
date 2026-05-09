@@ -6,7 +6,7 @@ import { useTheme } from '@/src/context/ThemeContext';
 import {
 	initRevenueCat,
 	purchaseWeeklySubscription,
-	restorePurchases
+	restorePurchases,
 } from '@/src/services/revenuecat';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -26,7 +26,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { width } = Dimensions.get('window');
-const SLIDE_WIDTH = width - 48; // Match padding
+const SLIDE_WIDTH = width - 48;
 
 const SLIDES = [
 	{ id: '1', titleKey: 'knowWhatsLeft', descriptionKey: 'knowWhatsLeftDesc', icon: '💰' },
@@ -48,10 +48,6 @@ export default function OnboardingScreen() {
 	const [isPurchasing, setIsPurchasing] = useState(false);
 	const [authError, setAuthError] = useState('');
 	const hasRedirected = useRef(false);
-	const [showPromoInput, setShowPromoInput] = useState(false);
-	const [promoCode, setPromoCode] = useState('');
-	const [promoError, setPromoError] = useState('');
-	const [promoLoading, setPromoLoading] = useState(false);
 
 	// Dev login state
 	const [showDevLogin, setShowDevLogin] = useState(false);
@@ -123,12 +119,10 @@ export default function OnboardingScreen() {
 	};
 
 	const handleContinue = async () => {
-		// Returning user flow — check if still subscribed
 		setIsPurchasing(true);
 		setAuthError('');
 
 		try {
-			// First try restore
 			const revenueCatUserId = await restorePurchases();
 			if (revenueCatUserId) {
 				await loginWithRevenueCat(revenueCatUserId);
@@ -136,7 +130,6 @@ export default function OnboardingScreen() {
 				return;
 			}
 
-			// Not subscribed — purchase without trial
 			const purchasedUserId = await purchaseWeeklySubscription();
 			if (purchasedUserId) {
 				await loginWithRevenueCat(purchasedUserId);
@@ -168,48 +161,6 @@ export default function OnboardingScreen() {
 			setIsPurchasing(false);
 		}
 	};
-
-	const handlePromoCode = async () => {
-    if (!promoCode.trim()) {
-        setPromoError('Enter a promo code');
-        return;
-    }
-    setPromoLoading(true);
-    setPromoError('');
-    try {
-        const { signInAnonymously } = await import('firebase/auth');
-        const { auth } = await import('@/src/config/firebase');
-        const cred = await signInAnonymously(auth);
-        const userId = cred.user.uid;
-
-        const { collection, getDocs } = await import('firebase/firestore');
-        const { db } = await import('@/src/config/firebase');
-        
-        const snap = await getDocs(collection(db, 'promoCodes'));
-        let foundPromo = null;
-        
-        snap.forEach((doc) => {
-            const data = doc.data();
-            if (data.code === promoCode.trim().toUpperCase() && data.active === true && data.currentUses < data.maxUses) {
-                foundPromo = { id: doc.id, ...data };
-            }
-        });
-
-        if (!foundPromo) {
-            setPromoError('Invalid or expired code');
-            setPromoLoading(false);
-            return;
-        }
-
-        await loginWithRevenueCat(userId);
-        router.replace('/(tabs)/dashboard');
-    } catch (err: any) {
-        console.error('[Promo] Error:', err);
-        setPromoError(err?.message || err?.code || 'Something went wrong. Try again.');
-    } finally {
-        setPromoLoading(false);
-    }
-};
 
 	// Dev auth (web only)
 	const handleDevAuth = async () => {
@@ -423,7 +374,7 @@ export default function OnboardingScreen() {
 
 							<View style={styles.legalRow}>
 								<TouchableOpacity onPress={handleRestore}>
-									<Text style={[styles.legalText, {color: colors.primaryText }]}>{t.restorePurchase}</Text>
+									<Text style={[styles.legalText, { color: colors.primaryText }]}>{t.restorePurchase}</Text>
 								</TouchableOpacity>
 								<TouchableOpacity>
 									<Text style={[styles.legalText, { color: colors.primaryText }]}>{t.termsOfUse}</Text>
@@ -432,41 +383,7 @@ export default function OnboardingScreen() {
 									<Text style={[styles.legalText, { color: colors.primaryText }]}>{t.privacyPolicy}</Text>
 								</TouchableOpacity>
 							</View>
-							{!showPromoInput ? (
-    <TouchableOpacity onPress={() => setShowPromoInput(true)} style={{ marginTop: 12 }}>
-        <Text style={{ fontSize: 13, fontWeight: '600', textDecorationLine: 'underline', color: colors.primaryText }}>Have a code?</Text>
-    </TouchableOpacity>
-) : (
-    <View style={{ marginTop: 12, alignItems: 'center', gap: 8, width: '100%' }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 12, overflow: 'hidden', width: '100%', backgroundColor: colors.inputBg, borderColor: colors.inputBorder }}>
-            <TextInput
-                style={{ flex: 1, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, fontWeight: '600', color: colors.primaryText }}
-                placeholder="Enter promo code"
-                placeholderTextColor={colors.tertiaryText}
-                autoCapitalize="characters"
-                autoCorrect={false}
-                value={promoCode}
-                onChangeText={setPromoCode}
-            />
-            <TouchableOpacity
-                style={{ paddingHorizontal: 16, paddingVertical: 12, backgroundColor: colors.accent }}
-                onPress={handlePromoCode}
-                disabled={promoLoading}
-            >
-                {promoLoading ? (
-                    <ActivityIndicator color={colors.buttonText} size="small" />
-                ) : (
-                    <Text style={{ fontSize: 14, fontWeight: '700', color: colors.buttonText }}>Redeem</Text>
-                )}
-            </TouchableOpacity>
-        </View>
-        {promoError ? <Text style={{ fontSize: 12, fontWeight: '500', color: colors.danger }}>{promoError}</Text> : null}
-        <TouchableOpacity onPress={() => { setShowPromoInput(false); setPromoError(''); }}>
-            <Text style={{ fontSize: 13, fontWeight: '500', color: colors.secondaryText }}>Cancel</Text>
-        </TouchableOpacity>
-    </View>
-)}
-					</>
+						</>
 					)}
 				</View>
 			</SafeAreaView>
