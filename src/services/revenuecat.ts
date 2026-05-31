@@ -63,19 +63,17 @@ export async function purchaseWeeklySubscription(): Promise<string | null> {
 			return null;
 		}
 
-		const weekly = offerings.current.weekly ||
+		const monthly = offerings.current.monthly ||
 			offerings.current.availablePackages?.find(
-				(p: any) => p.packageType === 'WEEKLY' || p.identifier === '$rc_weekly'
+				(p: any) => p.packageType === 'MONTHLY' || p.identifier === '$rc_monthly'
 			);
 
-		if (!weekly) {
-			console.warn('[RevenueCat] No weekly package found');
+		if (!monthly) {
+			console.warn('[RevenueCat] No monthly package found');
 			return null;
 		}
 
-		// Purchase - this shows the Apple subscription sheet with Face ID
-		// ONE popup, ONE Face ID confirmation - subscription + auth in one step
-		const { customerInfo } = await PurchasesModule.purchasePackage(weekly);
+		const { customerInfo } = await PurchasesModule.purchasePackage(monthly);
 
 		const isActive = customerInfo.entitlements?.active?.[ENTITLEMENT_ID] !== undefined;
 		console.log('[RevenueCat] Purchase complete, active:', isActive);

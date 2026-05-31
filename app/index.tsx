@@ -368,9 +368,7 @@ export default function OnboardingScreen() {
 								</LinearGradient>
 							</TouchableOpacity>
 
-							<Text style={[styles.pricingText, { color: colors.primaryText }]}>
-								{t.threeDaysFree}, then $2.99/week
-							</Text>
+							<Text style={[styles.pricingText, { color: colors.primaryText }]}>7 days free, then $2.99/month</Text>
 
 							<View style={styles.legalRow}>
 								<TouchableOpacity onPress={handleRestore}>
